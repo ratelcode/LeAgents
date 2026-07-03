@@ -101,7 +101,7 @@ A subprocess wrapper over `lerobot-train` with structured config, log parsing, a
 
 - **Default policy [verified]:** **SmolVLA** (`lerobot/smolvla_base`, 450M) — designed to be fine-tuned (not zero-shot); **20k steps ≈ 4 h on one A100** (~10 h on RTX 3090; ~18 ms/step, ~0.9 GB VRAM at inference). This sets the loop cadence: several full cycles per day on one GPU.
 - **Escalation path [verified]:** π0.5 / GR00T N1.5 via `--policy.type` swap when SmolVLA plateaus. π0/π0.5 are native in-tree since v0.4.0, validated against OpenPI (97.5% vs 96.85% on LIBERO); checkpoints `lerobot/pi05_base`, `lerobot/pi05_libero` need only `pip install -e '.[pi]'`.
-- **Data loading [recommendation]:** default to **local cache + Hub sync** rather than pure `StreamingLeRobotDataset` for in-loop training — streaming has known rough edges (issue #3080 decoding failures, #3672 shuffle-buffer shard-hopping I/O, segfault with `DataLoader num_workers>0`, `n_action_step` unsupported in streaming).
+- **Data loading [verified empirically, July 2026]:** default to **local cache + Hub sync** rather than pure `StreamingLeRobotDataset` for in-loop training. Confirmed on lerobot 0.5.1: `--dataset.streaming=true` yields empty batches with action-chunking policies (SmolVLA/ACT/π0) because the streaming loader cannot serve delta-timestamp action windows; use `--dataset.episodes=[...]` for partial shard downloads of large datasets instead (HuggingFaceVLA/libero is ~70 GB). Other known rough edges: issue #3080 decoding failures, #3672 shuffle-buffer shard-hopping I/O, segfault with `DataLoader num_workers>0`.
 
 ### 3.4 Eval Agent
 

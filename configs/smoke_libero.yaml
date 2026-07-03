@@ -1,0 +1,51 @@
+# LIBERO smoke: one short SmolVLA cycle on HuggingFaceVLA/libero (70GB total)
+# using --dataset.episodes to pull only a few episodes' shards instead of the
+# full dataset. Checks plumbing, not skill.
+# NOTE: --dataset.streaming=true does NOT work with action-chunking policies
+# (SmolVLA/ACT/pi0) on lerobot 0.5.1 — the streaming loader can't serve
+# delta-timestamp action windows and yields empty batches (DESIGN.md §3.3).
+run_name: smoke-libero
+workdir: runs
+seed_dataset: HuggingFaceVLA/libero
+
+policy_ladder:
+  - name: smolvla
+    init: lerobot/smolvla_base
+
+budgets:
+  max_cycles: 1
+  max_gpu_hours: 2
+
+thresholds:
+  promote_delta: 0.05
+  regression_delta: 0.05
+  plateau_epsilon: 0.01
+  plateau_cycles: 2
+
+# SmolVLA base expects camera1/2/3; the LIBERO dataset and env both expose
+# image (agentview) / image2 (eye-in-hand). Two-of-three cameras is fine —
+# lerobot's visual-feature check accepts a subset in either direction.
+train:
+  steps: 20
+  batch_size: 2
+  extra_args:
+    - --policy.device=cuda
+    - --dataset.episodes=[0, 1, 2, 3]
+    - --save_freq=20
+    - --log_freq=5
+    - '--rename_map={"observation.images.image": "observation.images.camera1", "observation.images.image2": "observation.images.camera2"}'
+
+eval:
+  env_type: libero
+  task_suite: libero_spatial
+  n_episodes: 2
+  extra_args:
+    - --policy.device=cuda
+    - '--rename_map={"observation.images.image": "observation.images.camera1", "observation.images.image2": "observation.images.camera2"}'
+
+llm: null
+knowledge:
+  enabled: true
+  root: knowledge
+
+constitution: configs/constitution.yaml
