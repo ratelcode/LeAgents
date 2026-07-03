@@ -17,6 +17,7 @@ class Proposal(BaseModel):
 
     action: str  # "reuse_seed" | "recollect_failing"
     dataset: str
+    num_episodes: int | None = None  # None -> full dataset
     notes: str = ""
 
 

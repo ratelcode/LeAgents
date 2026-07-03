@@ -34,3 +34,19 @@ def test_plateau_needs_enough_cycles():
 def test_noisy_history_does_not_plateau():
     # last window contains a non-plateau score
     assert decide(0.505, 0.50, [0.53], T) is Decision.ITERATE
+
+
+def test_proposer_episode_growth():
+    from leagent.orchestrator import DeterministicProposer
+
+    proposer = DeterministicProposer("org/seed", initial_episodes=8, growth=2.0,
+                                     max_episodes=20)
+    assert proposer.propose(0, None).num_episodes == 8
+    assert proposer.propose(1, None).num_episodes == 16
+    assert proposer.propose(2, None).num_episodes == 20  # capped
+
+
+def test_proposer_full_dataset_by_default():
+    from leagent.orchestrator import DeterministicProposer
+
+    assert DeterministicProposer("org/seed").propose(0, None).num_episodes is None

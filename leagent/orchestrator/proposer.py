@@ -21,13 +21,33 @@ class Proposer(Protocol):
 
 
 class DeterministicProposer:
-    def __init__(self, seed_dataset: str, failing_threshold: float = 0.5):
+    def __init__(
+        self,
+        seed_dataset: str,
+        initial_episodes: int | None = None,
+        growth: float = 2.0,
+        max_episodes: int | None = None,
+        failing_threshold: float = 0.5,
+    ):
         self.seed_dataset = seed_dataset
+        self.initial_episodes = initial_episodes
+        self.growth = growth
+        self.max_episodes = max_episodes
         self.failing_threshold = failing_threshold
 
+    def _episodes_for(self, cycle: int) -> int | None:
+        """Progressive data schedule: each cycle reveals more of the seed data."""
+        if self.initial_episodes is None:
+            return None
+        n = int(self.initial_episodes * self.growth**cycle)
+        return min(n, self.max_episodes) if self.max_episodes else n
+
     def propose(self, cycle: int, last_report: EvalReport | None) -> Proposal:
+        num_episodes = self._episodes_for(cycle)
         if last_report is None or not last_report.per_task:
-            return Proposal(action="reuse_seed", dataset=self.seed_dataset)
+            return Proposal(
+                action="reuse_seed", dataset=self.seed_dataset, num_episodes=num_episodes
+            )
         failing = sorted(
             task
             for task, score in last_report.per_task.items()
@@ -36,6 +56,7 @@ class DeterministicProposer:
         return Proposal(
             action="recollect_failing",
             dataset=self.seed_dataset,
+            num_episodes=num_episodes,
             notes=f"focus tasks: {failing[:5]}" if failing else "no failing tasks",
         )
 
@@ -43,7 +64,8 @@ class DeterministicProposer:
 _PROPOSER_SYSTEM = (
     "You propose the next data-collection step for a robot-learning loop. Reply with ONLY a "
     'JSON object: {"action": "reuse_seed"|"recollect_failing", "dataset": "<hub repo id>", '
-    '"notes": "<short rationale>"}. Proposals are advisory; safety gates apply downstream.'
+    '"num_episodes": <int or null for the full dataset>, "notes": "<short rationale>"}. '
+    "Proposals are advisory; safety gates apply downstream."
 )
 
 

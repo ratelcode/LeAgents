@@ -7,7 +7,8 @@ from leagent.store import JobStore
 from tests.conftest import make_eval_runner, make_train_runner
 
 
-def _controller(loop_config, constitution, tmp_path, eval_scores, knowledge_root=None):
+def _controller(loop_config, constitution, tmp_path, eval_scores, knowledge_root=None,
+                seen_train_cmds=None):
     bus = EventBus(tmp_path / "events.jsonl")
     store = JobStore(tmp_path / "leagent.db")
     controller = LoopController(
@@ -15,7 +16,8 @@ def _controller(loop_config, constitution, tmp_path, eval_scores, knowledge_root
         store=store,
         bus=bus,
         data_agent=DataAgent(bus),
-        train_agent=TrainAgent(loop_config.train, constitution, bus, make_train_runner()),
+        train_agent=TrainAgent(loop_config.train, constitution, bus,
+                               make_train_runner(seen_cmds=seen_train_cmds)),
         eval_agent=EvalAgent(loop_config.eval, constitution, bus,
                              make_eval_runner(eval_scores)),
         proposer=DeterministicProposer(loop_config.seed_dataset),
@@ -69,6 +71,31 @@ def test_gpu_hour_budget_stops_loop(loop_config, constitution, tmp_path):
 
     assert summary.cycles_run < 3
     assert summary.stop_reason == "budget: max_gpu_hours"
+
+
+def test_later_cycles_continue_from_blessed_checkpoint(loop_config, constitution, tmp_path):
+    cmds: list = []
+    controller, _ = _controller(
+        loop_config, constitution, tmp_path, eval_scores=[0.50, 0.60, 0.70],
+        seen_train_cmds=cmds,
+    )
+    controller.run("run-continue", tmp_path / "wd")
+
+    # cycle 0 starts from the ladder init; cycles 1-2 from the prior blessed checkpoint
+    assert "--policy.path=lerobot/smolvla_base" in cmds[0]
+    assert any("cycle_0/train/checkpoints/last" in arg for arg in cmds[1])
+    assert any("cycle_1/train/checkpoints/last" in arg for arg in cmds[2])
+
+
+def test_continue_from_blessed_can_be_disabled(loop_config, constitution, tmp_path):
+    loop_config.train.continue_from_blessed = False
+    cmds: list = []
+    controller, _ = _controller(
+        loop_config, constitution, tmp_path, eval_scores=[0.50, 0.60],
+        seen_train_cmds=cmds,
+    )
+    controller.run("run-fresh", tmp_path / "wd")
+    assert all("--policy.path=lerobot/smolvla_base" in cmd for cmd in cmds)
 
 
 def test_knowledge_pages_written_each_cycle(loop_config, constitution, tmp_path):

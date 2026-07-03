@@ -28,9 +28,19 @@ class TrainAgent:
         self.bus = bus
         self.runner = runner
 
-    def build_command(self, rung: PolicyRung, dataset: DatasetRef, output_dir: Path) -> list[str]:
-        policy_arg = (
-            f"--policy.path={rung.init}" if rung.init else f"--policy.type={rung.name}"
+    def build_command(
+        self,
+        rung: PolicyRung,
+        dataset: DatasetRef,
+        output_dir: Path,
+        init_override: str | None = None,
+    ) -> list[str]:
+        init = init_override or rung.init
+        policy_arg = f"--policy.path={init}" if init else f"--policy.type={rung.name}"
+        episodes_args = (
+            [f"--dataset.episodes={list(range(dataset.num_episodes))}"]
+            if dataset.num_episodes
+            else []
         )
         return [
             "lerobot-train",
@@ -39,6 +49,7 @@ class TrainAgent:
             # push is explicitly off; leagent manages checkpoints locally.
             "--policy.push_to_hub=false",
             f"--dataset.repo_id={dataset.repo_id}",
+            *episodes_args,
             f"--output_dir={output_dir}",
             f"--steps={self.cfg.steps}",
             f"--batch_size={self.cfg.batch_size}",
@@ -46,10 +57,17 @@ class TrainAgent:
         ]
 
     def run(
-        self, *, run_id: str, cycle: int, rung: PolicyRung, dataset: DatasetRef, workdir: Path
+        self,
+        *,
+        run_id: str,
+        cycle: int,
+        rung: PolicyRung,
+        dataset: DatasetRef,
+        workdir: Path,
+        init_override: str | None = None,
     ) -> CheckpointRecord:
         output_dir = workdir / f"cycle_{cycle}" / "train"
-        cmd = self.build_command(rung, dataset, output_dir)
+        cmd = self.build_command(rung, dataset, output_dir, init_override)
 
         for verdict in (self.constitution.check_train(self.cfg.steps),
                         self.constitution.check_command(cmd)):

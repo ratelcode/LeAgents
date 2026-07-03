@@ -1,0 +1,53 @@
+# Mini M0: 3 real cycles in ~30-60 min on one consumer GPU. Demonstrates the
+# flywheel-lite loop with a real signal: data doubles each cycle (8→16→32
+# episodes), weights carry over, LIBERO eval gates each promotion.
+run_name: m0-libero-mini
+workdir: runs
+seed_dataset: HuggingFaceVLA/libero
+
+data:
+  initial_episodes: 8
+  growth: 2.0
+  max_episodes: 32
+
+policy_ladder:
+  - name: smolvla
+    init: lerobot/smolvla_base
+  - name: pi05
+    init: lerobot/pi05_base
+
+budgets:
+  max_cycles: 3
+  max_gpu_hours: 4
+
+thresholds:
+  promote_delta: 0.05
+  regression_delta: 0.05
+  plateau_epsilon: 0.01
+  plateau_cycles: 2
+
+train:
+  steps: 300
+  batch_size: 8
+  continue_from_blessed: true
+  extra_args:
+    - --policy.device=cuda
+    - --save_freq=300
+    - --log_freq=50
+    - '--rename_map={"observation.images.image": "observation.images.camera1", "observation.images.image2": "observation.images.camera2"}'
+
+eval:
+  env_type: libero
+  task_suite: libero_spatial
+  n_episodes: 5
+  batch_size: 5
+  extra_args:
+    - --policy.device=cuda
+    - '--rename_map={"observation.images.image": "observation.images.camera1", "observation.images.image2": "observation.images.camera2"}'
+
+llm: null
+knowledge:
+  enabled: true
+  root: knowledge
+
+constitution: configs/constitution.yaml

@@ -35,9 +35,26 @@ class ThresholdConfig(BaseModel):
     plateau_cycles: int = 2
 
 
+class DataConfig(BaseModel):
+    """Progressive data schedule (flywheel-lite, DESIGN.md §3.5).
+
+    With ``initial_episodes`` set, cycle N trains on the first
+    ``initial_episodes * growth**N`` episodes (capped at ``max_episodes``) —
+    each iterate genuinely adds data, so eval deltas measure data growth.
+    None -> always use the full dataset.
+    """
+
+    initial_episodes: int | None = None
+    growth: float = 2.0
+    max_episodes: int | None = None
+
+
 class TrainConfig(BaseModel):
     steps: int = 20_000
     batch_size: int = 64
+    # Continue fine-tuning from the run's blessed checkpoint (same policy)
+    # instead of restarting from the ladder's init every cycle.
+    continue_from_blessed: bool = True
     extra_args: list[str] = Field(default_factory=list)
 
 
@@ -65,6 +82,7 @@ class LoopConfig(BaseModel):
     # "openai:qwen3@http://localhost:11434/v1". None -> deterministic fallbacks.
     llm: str | None = None
     knowledge: KnowledgeConfig = Field(default_factory=KnowledgeConfig)
+    data: DataConfig = Field(default_factory=DataConfig)
     policy_ladder: list[PolicyRung] = Field(
         default_factory=lambda: [
             PolicyRung(name="smolvla", init="lerobot/smolvla_base"),

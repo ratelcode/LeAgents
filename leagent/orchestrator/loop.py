@@ -89,10 +89,20 @@ class LoopController:
                 proposal = self.proposer.propose(cycle, last_report)
                 dataset = self.data_agent.run(run_id=run_id, cycle=cycle, proposal=proposal)
 
-                # TRAIN
+                # TRAIN — continue from the blessed checkpoint when it is the
+                # same policy (flywheel-lite: data grows, weights carry over)
+                init_override = None
+                blessed = self.store.blessed_checkpoint(run_id)
+                if (
+                    self.cfg.train.continue_from_blessed
+                    and blessed
+                    and blessed["policy_type"] == rung.name
+                ):
+                    init_override = blessed["path"]
                 self.store.set_stage(run_id, cycle, "train")
                 checkpoint = self.train_agent.run(
-                    run_id=run_id, cycle=cycle, rung=rung, dataset=dataset, workdir=workdir
+                    run_id=run_id, cycle=cycle, rung=rung, dataset=dataset, workdir=workdir,
+                    init_override=init_override,
                 )
                 checkpoint_id = self.store.add_checkpoint(
                     run_id, cycle, checkpoint.policy_type, checkpoint.path

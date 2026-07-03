@@ -64,7 +64,12 @@ def cmd_run(args: argparse.Namespace) -> int:
     runner = _dry_runner_with_synthetic_eval if args.dry_run else subprocess_runner
 
     llm = make_llm(cfg.llm)
-    fallback = DeterministicProposer(cfg.seed_dataset)
+    fallback = DeterministicProposer(
+        cfg.seed_dataset,
+        initial_episodes=cfg.data.initial_episodes,
+        growth=cfg.data.growth,
+        max_episodes=cfg.data.max_episodes,
+    )
     knowledge_agent = (
         KnowledgeAgent(cfg.knowledge.root, bus, llm) if cfg.knowledge.enabled else None
     )

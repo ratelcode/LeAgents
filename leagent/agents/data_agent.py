@@ -16,14 +16,23 @@ class DataAgent:
         self.bus = bus
 
     def run(self, *, run_id: str, cycle: int, proposal: Proposal) -> DatasetRef:
-        ref = DatasetRef(repo_id=proposal.dataset, notes=proposal.notes)
+        ref = DatasetRef(
+            repo_id=proposal.dataset,
+            num_episodes=proposal.num_episodes,
+            notes=proposal.notes,
+        )
         self.bus.emit(
             Event(
                 run_id=run_id,
                 stage="collect",
                 kind="dataset_resolved",
                 cycle=cycle,
-                payload={"action": proposal.action, "repo_id": ref.repo_id, "notes": ref.notes},
+                payload={
+                    "action": proposal.action,
+                    "repo_id": ref.repo_id,
+                    "num_episodes": ref.num_episodes,
+                    "notes": ref.notes,
+                },
             )
         )
         return ref

@@ -13,10 +13,12 @@ def _arg(cmd, prefix: str) -> str:
     return next(a.split("=", 1)[1] for a in cmd if a.startswith(prefix))
 
 
-def make_train_runner(duration_s: float = 3600.0):
+def make_train_runner(duration_s: float = 3600.0, seen_cmds: list | None = None):
     """Fake lerobot-train: creates the expected checkpoint directory."""
 
     def runner(cmd, log_path: Path) -> RunResult:
+        if seen_cmds is not None:
+            seen_cmds.append(list(cmd))
         output_dir = Path(_arg(cmd, "--output_dir="))
         (output_dir / "checkpoints" / "last" / "pretrained_model").mkdir(
             parents=True, exist_ok=True
