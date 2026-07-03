@@ -1,0 +1,17 @@
+# Constitution safety gate — M0 scope (DESIGN.md §3.1, §6).
+# M0 is sim-only: real-hardware entrypoints and the async-inference gRPC
+# path (CVE-2026-25874, fixed in lerobot >= 0.6.0) are denied outright.
+# Every verdict is written to the event log for audit.
+
+allowed_env_types: [libero, metaworld]
+max_train_steps: 200000
+max_eval_episodes: 500
+
+forbidden_commands:
+  - lerobot-record          # real-hardware collection (M3)
+  - lerobot-teleoperate
+  - lerobot-async-inference # CVE-2026-25874: pickle RCE in gRPC path
+
+forbidden_args:
+  - --robot                 # real-hardware drivers (M3)
+  - --teleop

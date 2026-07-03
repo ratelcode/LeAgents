@@ -1,0 +1,17 @@
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# leagent runtime artifacts
+runs/
+outputs/
+wandb/
+
+# misc
+.DS_Store

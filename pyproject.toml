@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "leagent"
+version = "0.0.1"
+description = "Agentic orchestration for the LeRobot pipeline: collect -> train -> eval -> improve"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "ratel" }]
+dependencies = [
+    "pydantic>=2.5",
+    "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+# LeRobot moves fast (see DESIGN.md §6) — pin an exact version at install time.
+lerobot = ["lerobot[smolvla,libero]>=0.5"]
+dev = ["pytest>=8", "ruff>=0.4"]
+
+[project.scripts]
+leagent = "leagent.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["leagent*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
