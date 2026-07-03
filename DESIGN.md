@@ -21,7 +21,7 @@ What no one has shipped as **open source glue**: these loop patterns wired onto 
 
 ## 2. Architecture overview
 
-**One shared contract, five agents.** Every stage reads and writes LeRobotDataset v3.0 on the HF Hub; agents coordinate through the Orchestrator, never directly through each other's internals.
+**One shared contract, five agents — plus a knowledge layer from M1.** Every stage reads and writes LeRobotDataset v3.0 on the HF Hub; agents coordinate through the Orchestrator, never directly through each other's internals. From M1, a Knowledge Agent distills run events into a curated OKF wiki that feeds task proposal (§3.6).
 
 ```mermaid
 flowchart TB
@@ -36,9 +36,11 @@ flowchart TB
         TA[Training Agent<br/>lerobot-train wrapper]
         EA[Eval Agent<br/>lerobot-eval / LIBERO gate]
         IA[Improvement Agent<br/>DexFlyWheel cycle / HIL-SERL]
+        KA[Knowledge Agent M1<br/>ingest · lint]
     end
 
     HUB[(LeRobotDataset v3.0<br/>+ checkpoints on HF Hub)]
+    KNOW[(Knowledge base<br/>knowledge/ OKF wiki)]
     DASH[Dashboard<br/>flow view · episodes · curves · traces]
 
     LC -->|dispatch| DA & TA & EA & IA
@@ -47,7 +49,8 @@ flowchart TB
     TA -->|checkpoints| HUB
     HUB --> EA
     EA -->|eval report| LC
-    IA -->|filtered rollouts| HUB
+    KA -->|distilled lessons| KNOW
+    KNOW -->|curated context| TP
     ORCH & WORKERS -.->|events + traces| DASH
 ```
 
@@ -121,6 +124,37 @@ Verified result: from **1 human demo per task → 2,000+ successful demos across
 
 **Real-robot leg [verified]:** LeRobot ships **HIL-SERL** (`.[hilserl]` extra; `lerobot.rl.actor` / `lerobot.rl.learner` gRPC actor-learner + trained binary reward classifier + human interventions) as the on-hardware RL workflow. Whether HIL-SERL composes cleanly with sim-side flywheel amplification is an **open question** — treat as an experiment track, not a dependency.
 
+### 3.6 Knowledge Agent & the Knowledge Layer (M1)
+
+*Added July 2026. Grounded in web sources (not adversarially verified): [Karpathy's LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) (Apr 2026 — LLM-as-compiler over immutable raw sources producing an interlinked markdown wiki) and Google's [Open Knowledge Format (OKF)](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md) (June 2026 — vendor-neutral spec: a directory of markdown + YAML frontmatter, explicit producer/consumer independence).*
+
+**Problem it solves:** without this layer the loop accumulates *data* (events, checkpoints, eval reports) but not *lessons*. The self-improvement flywheel (§3.5) grows the dataset; the knowledge layer grows the system's understanding of *why* runs succeed or fail, and feeds that back into task proposal.
+
+**Structure — Karpathy's three layers mapped onto leagent:**
+
+| Layer | Karpathy LLM Wiki | leagent |
+|---|---|---|
+| 1 — Raw sources (immutable; LLM reads, never edits) | curated documents | already exists: `events.jsonl`, eval reports, train logs, SQLite run history |
+| 2 — The wiki (LLM-owned, interlinked markdown) | entity/concept pages | `knowledge/` — an **OKF bundle** (markdown + YAML frontmatter): per-**task** pages (failure modes, data strategies that worked), per-**policy** pages (e.g. "SmolVLA needs ~50 episodes per variation; 25 failed"), per-**experiment** lesson pages | 
+| 3 — Schema/conventions file | `CLAUDE.md`/`AGENTS.md` | `knowledge/KNOWLEDGE.md` — page structure, frontmatter schema, update workflows, lint rules |
+
+**Knowledge Agent — two operations** (mirroring the LLM Wiki workflow):
+
+1. **Ingest** — dispatched by the Orchestrator after each cycle (`run_finished`): reads the cycle's events and eval report (Layer 1), updates the affected task/policy/experiment pages (Layer 2). One cycle typically touches a handful of pages, like the wiki pattern's multi-page updates per source.
+2. **Lint (health check)** — periodic pass over the wiki: contradictions (a task page claiming a strategy works while recent eval deltas say otherwise), stale claims, and coverage gaps. Findings are surfaced as *proposals for the next experiments* — closing a second, slower improvement loop on top of the data flywheel.
+
+**Consumers (OKF producer/consumer independence):**
+- **Proposer (§3.1)** — the M1 LLM proposer reads the relevant task/policy pages into context before proposing, replacing raw-history dumps with curated, compounding knowledge. This is the primary consumer.
+- **Data Agent curation (§3.2)** — feasibility/constraint evaluators read constraint pages.
+- **Dashboard (§5)** — renders the wiki as a browsable view.
+- **Humans** — pages are plain markdown; maintainers can author or correct pages directly, and agents consume them identically.
+
+**Rules (consistent with §2 and §4):**
+- Knowledge pages are **advisory context only — never control flow**. Promote/iterate/escalate/rollback stays a pure function of eval deltas.
+- Every claim on a page carries **provenance** (run/cycle ids, event refs) in frontmatter, and a confidence status (`observed-once | replicated | human-confirmed`) — the same verified/unverified discipline this document uses.
+- Layer 1 artifacts are immutable; the Knowledge Agent writes only under `knowledge/`.
+- The bundle is vendor-neutral by construction (OKF), so it can be published to the HF Hub alongside datasets and consumed by other tools or teams' agents.
+
 ---
 
 ## 4. Orchestration framework  **[recommendation — zero claims in this area survived verification; re-validate by prototyping]**
@@ -170,11 +204,13 @@ leagent/
 │   │   ├── data_agent/      # curation (RoboGene-style), collection drivers, mimicgen/genaug adapters
 │   │   ├── train_agent/     # lerobot-train subprocess wrapper, checkpoint registry
 │   │   ├── eval_agent/      # lerobot-eval wrapper, LIBERO gate, A/B stats, success classifier
-│   │   └── improve_agent/   # DexFlyWheel cycle, residual RL, HIL-SERL adapter (experimental)
+│   │   ├── improve_agent/   # DexFlyWheel cycle, residual RL, HIL-SERL adapter (experimental)
+│   │   └── knowledge_agent/ # (M1) ingest run events → OKF wiki pages; periodic lint pass
 │   ├── contracts/           # LeRobotDataset v3 read/write helpers, checkpoint & eval-report schemas
 │   ├── events/              # event bus + OTel GenAI tracing
 │   └── store/               # job store (SQLite→Postgres), resumable job records
 ├── dashboard/               # FastAPI backend + React flow view; embeds Rerun/WandB
+├── knowledge/               # (M1) OKF bundle: task/policy/experiment pages + KNOWLEDGE.md schema
 ├── configs/                 # loop budgets, policy escalation ladder, eval protocol, constitution.yaml
 ├── docs/
 └── tests/                   # sim-only e2e: tiny dataset → 1 full cycle on LIBERO spatial suite
@@ -183,7 +219,7 @@ leagent/
 ## 8. Milestones
 
 - **M0 — Sim-only MVP (the honest demo).** One full automated cycle on LIBERO: seed dataset → SmolVLA fine-tune (~4 h/A100) → `lerobot-eval` gate → iterate-or-promote decision. CLI only, events logged. *Everything here uses only [verified] capabilities.*
-- **M1 — Flywheel.** DexFlyWheel-style improvement cycle in sim (residual RL + success-filtered rollouts + augmentation); policy escalation ladder (SmolVLA → π0.5); dataset coverage stats driving task proposal.
+- **M1 — Flywheel + knowledge.** DexFlyWheel-style improvement cycle in sim (residual RL + success-filtered rollouts + augmentation); policy escalation ladder (SmolVLA → π0.5); dataset coverage stats driving task proposal. **Knowledge layer (§3.6):** `knowledge/` OKF bundle + Knowledge Agent (post-cycle ingest, periodic lint); the LLM proposer reads task/policy pages as its context — behind a provider-agnostic LLM adapter so any model (Claude, GPT, local) can drive it.
 - **M2 — Dashboard.** Flow view + Rerun episode replay + WandB embeds + OTel traces; human-approval gates in UI.
 - **M3 — Real robot (experimental track).** Teleop collection target (~50 eps/variation), held-out real eval with success classifier + human spot-checks, HIL-SERL adapter behind a sandbox (post-CVE-fix LeRobot ≥ 0.6.0).
 
@@ -195,3 +231,4 @@ leagent/
 **Data generation/augmentation:** DexMimicGen (ICRA 2025) [arXiv:2410.24185](https://arxiv.org/abs/2410.24185) · GenAug (RSS 2023) [arXiv:2302.06671](https://arxiv.org/abs/2302.06671)
 **Eval:** [LIBERO](https://github.com/Lifelong-Robot-Learning/LIBERO) · [SimplerEnv](https://github.com/simpler-env/SimplerEnv)
 **Ops/observability:** [Anthropic: effective harnesses for long-running agents](https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents) · [Rerun × LeRobot example](https://rerun.io/examples/generative-vision/lerobot) · [OTel GenAI observability](https://opentelemetry.io/blog/2026/genai-observability/)
+**Knowledge layer:** [Karpathy LLM Wiki gist](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) · [Google OKF spec](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md) · [OKF on Google Cloud blog](https://cloud.google.com/blog/products/data-analytics/how-the-open-knowledge-format-can-improve-data-sharing)
