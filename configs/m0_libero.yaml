@@ -49,11 +49,13 @@ train:
     - --log_freq=100
     - '--rename_map={"observation.images.image": "observation.images.camera1", "observation.images.image2": "observation.images.camera2"}'
 
+# Parallel LIBERO envs are GPU-hungry (MuJoCo EGL rendering + policy
+# inference): keep batch_size <= 2 on 16GB cards.
 eval:
   env_type: libero
   task_suite: libero_spatial
   n_episodes: 10
-  batch_size: 5
+  batch_size: 2
   extra_args:
     - --policy.device=cuda
     - '--rename_map={"observation.images.image": "observation.images.camera1", "observation.images.image2": "observation.images.camera2"}'
