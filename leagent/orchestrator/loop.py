@@ -21,6 +21,7 @@ from leagent.store import JobStore
 if TYPE_CHECKING:  # runtime import would be circular: agents depend on orchestrator
     from leagent.agents.data_agent import DataAgent
     from leagent.agents.eval_agent import EvalAgent
+    from leagent.agents.knowledge_agent import KnowledgeAgent
     from leagent.agents.train_agent import TrainAgent
 
 
@@ -47,6 +48,7 @@ class LoopController:
         train_agent: TrainAgent,
         eval_agent: EvalAgent,
         proposer: Proposer,
+        knowledge_agent: KnowledgeAgent | None = None,
     ):
         self.cfg = cfg
         self.store = store
@@ -55,6 +57,7 @@ class LoopController:
         self.train_agent = train_agent
         self.eval_agent = eval_agent
         self.proposer = proposer
+        self.knowledge_agent = knowledge_agent
         self._job_seconds = 0.0
         bus.subscribe(self._track_budget)
 
@@ -111,6 +114,12 @@ class LoopController:
                 self.store.finish_cycle(run_id, cycle, decision.value)
                 summary.decisions.append(decision.value)
                 summary.cycles_run = cycle + 1
+
+                if self.knowledge_agent:
+                    self.knowledge_agent.ingest(
+                        run_id=run_id, cycle=cycle, policy=rung.name,
+                        report=report, decision=decision.value,
+                    )
 
                 if decision is Decision.PROMOTE:
                     baseline = report.success_rate

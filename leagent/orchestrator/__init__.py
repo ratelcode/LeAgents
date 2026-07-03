@@ -1,7 +1,12 @@
 from leagent.orchestrator.constitution import Constitution, ConstitutionError, Verdict
 from leagent.orchestrator.decision import Decision, decide
 from leagent.orchestrator.loop import LoopController, RunSummary
-from leagent.orchestrator.proposer import DeterministicProposer, Proposal, Proposer
+from leagent.orchestrator.proposer import (
+    DeterministicProposer,
+    LLMProposer,
+    Proposal,
+    Proposer,
+)
 
 __all__ = [
     "Constitution",
@@ -12,6 +17,7 @@ __all__ = [
     "LoopController",
     "RunSummary",
     "DeterministicProposer",
+    "LLMProposer",
     "Proposal",
     "Proposer",
 ]

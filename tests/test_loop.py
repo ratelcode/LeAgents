@@ -1,13 +1,13 @@
 """End-to-end loop tests with fake runners — no lerobot, no GPU."""
 
-from leagent.agents import DataAgent, EvalAgent, TrainAgent
+from leagent.agents import DataAgent, EvalAgent, KnowledgeAgent, TrainAgent
 from leagent.events import EventBus
 from leagent.orchestrator import DeterministicProposer, LoopController
 from leagent.store import JobStore
 from tests.conftest import make_eval_runner, make_train_runner
 
 
-def _controller(loop_config, constitution, tmp_path, eval_scores):
+def _controller(loop_config, constitution, tmp_path, eval_scores, knowledge_root=None):
     bus = EventBus(tmp_path / "events.jsonl")
     store = JobStore(tmp_path / "leagent.db")
     controller = LoopController(
@@ -19,6 +19,7 @@ def _controller(loop_config, constitution, tmp_path, eval_scores):
         eval_agent=EvalAgent(loop_config.eval, constitution, bus,
                              make_eval_runner(eval_scores)),
         proposer=DeterministicProposer(loop_config.seed_dataset),
+        knowledge_agent=KnowledgeAgent(knowledge_root, bus) if knowledge_root else None,
     )
     return controller, store
 
@@ -68,6 +69,22 @@ def test_gpu_hour_budget_stops_loop(loop_config, constitution, tmp_path):
 
     assert summary.cycles_run < 3
     assert summary.stop_reason == "budget: max_gpu_hours"
+
+
+def test_knowledge_pages_written_each_cycle(loop_config, constitution, tmp_path):
+    root = tmp_path / "knowledge"
+    controller, _ = _controller(
+        loop_config, constitution, tmp_path, eval_scores=[0.50, 0.53, 0.60],
+        knowledge_root=root,
+    )
+    controller.run("run-knowledge", tmp_path / "wd")
+
+    policy_page = root / "policies" / "smolvla.md"
+    task_page = root / "tasks" / "libero_spatial.md"
+    assert policy_page.exists() and task_page.exists()
+    body = policy_page.read_text()
+    assert "status: replicated" in body  # 3 cycles -> >= 2 provenance entries
+    assert body.count("· cycle") == 3
 
 
 def test_events_are_logged_as_jsonl(loop_config, constitution, tmp_path):

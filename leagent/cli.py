@@ -7,10 +7,23 @@ import json
 import time
 from pathlib import Path
 
-from leagent.agents import DataAgent, EvalAgent, TrainAgent, dry_runner, subprocess_runner
+from leagent.agents import (
+    DataAgent,
+    EvalAgent,
+    KnowledgeAgent,
+    TrainAgent,
+    dry_runner,
+    subprocess_runner,
+)
 from leagent.config import LoopConfig
 from leagent.events import Event, EventBus
-from leagent.orchestrator import Constitution, DeterministicProposer, LoopController
+from leagent.llm import make_llm
+from leagent.orchestrator import (
+    Constitution,
+    DeterministicProposer,
+    LLMProposer,
+    LoopController,
+)
 from leagent.store import JobStore
 
 
@@ -45,6 +58,11 @@ def cmd_run(args: argparse.Namespace) -> int:
     constitution = Constitution.from_yaml(cfg.constitution)
     runner = _dry_runner_with_synthetic_eval if args.dry_run else subprocess_runner
 
+    llm = make_llm(cfg.llm)
+    fallback = DeterministicProposer(cfg.seed_dataset)
+    knowledge_agent = (
+        KnowledgeAgent(cfg.knowledge.root, bus, llm) if cfg.knowledge.enabled else None
+    )
     controller = LoopController(
         cfg=cfg,
         store=store,
@@ -52,7 +70,8 @@ def cmd_run(args: argparse.Namespace) -> int:
         data_agent=DataAgent(bus),
         train_agent=TrainAgent(cfg.train, constitution, bus, runner),
         eval_agent=EvalAgent(cfg.eval, constitution, bus, runner),
-        proposer=DeterministicProposer(cfg.seed_dataset),
+        proposer=LLMProposer(llm, cfg.knowledge.root, fallback),
+        knowledge_agent=knowledge_agent,
     )
     if args.dry_run:
         print(f"DRY RUN — commands are logged to {workdir}, nothing is executed.")

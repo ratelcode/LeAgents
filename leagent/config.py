@@ -48,10 +48,22 @@ class EvalConfig(BaseModel):
     extra_args: list[str] = Field(default_factory=list)
 
 
+class KnowledgeConfig(BaseModel):
+    """OKF knowledge layer (DESIGN.md §3.6)."""
+
+    enabled: bool = True
+    root: Path = Path("knowledge")
+
+
 class LoopConfig(BaseModel):
     run_name: str
     workdir: Path = Path("runs")
     seed_dataset: str
+    # Provider-agnostic LLM spec (leagent/llm/adapter.py), e.g.
+    # "anthropic:claude-sonnet-5", "openai:gpt-5.2",
+    # "openai:qwen3@http://localhost:11434/v1". None -> deterministic fallbacks.
+    llm: str | None = None
+    knowledge: KnowledgeConfig = Field(default_factory=KnowledgeConfig)
     policy_ladder: list[PolicyRung] = Field(
         default_factory=lambda: [
             PolicyRung(name="smolvla", init="lerobot/smolvla_base"),

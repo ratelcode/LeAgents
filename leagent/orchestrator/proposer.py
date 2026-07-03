@@ -1,15 +1,19 @@
 """Task proposal (DESIGN.md §3.1).
 
-M0 uses a deterministic proposer; the LLM-backed proposer (Claude Agent
-SDK) lands with M1 task curation. The interface stays identical so the
-loop does not change when intelligence is swapped in.
+M0 ships a deterministic proposer. LLMProposer (M1) reads knowledge
+pages (§3.6) and asks the configured provider-agnostic LLM, falling back
+to the deterministic proposer whenever the LLM is absent or unusable —
+so the loop runs identically with or without a model.
 """
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Protocol
 
 from leagent.contracts import EvalReport, Proposal
+from leagent.llm import LLMClient
 
 
 class Proposer(Protocol):
@@ -34,3 +38,52 @@ class DeterministicProposer:
             dataset=self.seed_dataset,
             notes=f"focus tasks: {failing[:5]}" if failing else "no failing tasks",
         )
+
+
+_PROPOSER_SYSTEM = (
+    "You propose the next data-collection step for a robot-learning loop. Reply with ONLY a "
+    'JSON object: {"action": "reuse_seed"|"recollect_failing", "dataset": "<hub repo id>", '
+    '"notes": "<short rationale>"}. Proposals are advisory; safety gates apply downstream.'
+)
+
+
+class LLMProposer:
+    """Knowledge-aware proposer (M1). Advisory only — constitution and loop
+    gates still apply to whatever it proposes."""
+
+    def __init__(
+        self,
+        llm: LLMClient,
+        knowledge_root: Path,
+        fallback: DeterministicProposer,
+        max_pages: int = 6,
+    ):
+        self.llm = llm
+        self.knowledge_root = Path(knowledge_root)
+        self.fallback = fallback
+        self.max_pages = max_pages
+
+    def _knowledge_context(self) -> str:
+        if not self.knowledge_root.exists():
+            return ""
+        pages = sorted(
+            (p for p in self.knowledge_root.rglob("*.md") if p.name != "KNOWLEDGE.md"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )[: self.max_pages]
+        return "\n\n".join(f"<page path={p}>\n{p.read_text()}\n</page>" for p in pages)
+
+    def propose(self, cycle: int, last_report: EvalReport | None) -> Proposal:
+        prompt = (
+            f"Cycle: {cycle}\n"
+            f"Seed dataset: {self.fallback.seed_dataset}\n"
+            f"Last eval report: {last_report.model_dump_json() if last_report else 'none'}\n\n"
+            f"Knowledge pages (most recently updated first):\n{self._knowledge_context()}"
+        )
+        reply = self.llm.complete(prompt, system=_PROPOSER_SYSTEM)
+        try:
+            start, end = reply.index("{"), reply.rindex("}") + 1
+            data = json.loads(reply[start:end])
+            return Proposal.model_validate(data)
+        except (ValueError, TypeError):  # no/empty/unparseable reply -> deterministic
+            return self.fallback.propose(cycle, last_report)
