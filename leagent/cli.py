@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import sys
 import time
 from pathlib import Path
 
@@ -41,12 +43,15 @@ def _dry_runner_with_synthetic_eval(cmd, log_path):
         if out:
             Path(out).mkdir(parents=True, exist_ok=True)
             (Path(out) / "eval_info.json").write_text(
-                json.dumps({"aggregated": {"pc_success": 50.0}, "dry_run": True})
+                json.dumps({"overall": {"pc_success": 50.0}, "dry_run": True})
             )
     return result
 
 
 def cmd_run(args: argparse.Namespace) -> int:
+    # lerobot-train/-eval live next to this interpreter (same venv); make sure
+    # subprocesses resolve them even when the venv is not activated.
+    os.environ["PATH"] = str(Path(sys.executable).parent) + os.pathsep + os.environ.get("PATH", "")
     cfg = LoopConfig.from_yaml(args.config)
     run_id = args.run_id or f"{time.strftime('%Y%m%d-%H%M%S')}-{cfg.run_name}"
     workdir = cfg.workdir / run_id

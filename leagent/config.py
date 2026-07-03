@@ -45,6 +45,7 @@ class EvalConfig(BaseModel):
     env_type: str = "libero"
     task_suite: str = "libero_spatial"
     n_episodes: int = 10
+    batch_size: int = 10  # parallel eval envs; effective value is capped at n_episodes
     extra_args: list[str] = Field(default_factory=list)
 
 

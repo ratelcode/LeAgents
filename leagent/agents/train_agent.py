@@ -35,6 +35,9 @@ class TrainAgent:
         return [
             "lerobot-train",
             policy_arg,
+            # lerobot >= 0.5 refuses to train without policy.repo_id unless hub
+            # push is explicitly off; leagent manages checkpoints locally.
+            "--policy.push_to_hub=false",
             f"--dataset.repo_id={dataset.repo_id}",
             f"--output_dir={output_dir}",
             f"--steps={self.cfg.steps}",
@@ -56,7 +59,8 @@ class TrainAgent:
                 raise ConstitutionError(verdict)
 
         self.bus.emit(Event(run_id, "train", "job_started", cycle, {"cmd": cmd}))
-        result = self.runner(cmd, output_dir / "train.log")
+        # log lives outside output_dir: lerobot-train refuses a pre-existing output_dir
+        result = self.runner(cmd, output_dir.parent / "train.log")
         self.bus.emit(Event(run_id, "train", "job_finished", cycle,
                             {"exit_code": result.exit_code, "duration_s": result.duration_s,
                              "log": str(result.log_path)}))

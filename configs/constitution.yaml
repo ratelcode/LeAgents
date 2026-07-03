@@ -3,7 +3,7 @@
 # path (CVE-2026-25874, fixed in lerobot >= 0.6.0) are denied outright.
 # Every verdict is written to the event log for audit.
 
-allowed_env_types: [libero, metaworld]
+allowed_env_types: [libero, metaworld, pusht]
 max_train_steps: 200000
 max_eval_episodes: 500
 

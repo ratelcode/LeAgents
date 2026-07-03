@@ -38,7 +38,12 @@ def make_eval_runner(scores: list[float], duration_s: float = 60.0):
         calls["n"] += 1
         output_dir.mkdir(parents=True, exist_ok=True)
         (output_dir / "eval_info.json").write_text(
-            json.dumps({"aggregated": {"pc_success": score * 100.0}})
+            json.dumps(  # mirrors the lerobot 0.5 eval_info.json schema
+                {
+                    "overall": {"pc_success": score * 100.0},
+                    "per_group": {"suite_a": {"pc_success": score * 100.0}},
+                }
+            )
         )
         log_path.parent.mkdir(parents=True, exist_ok=True)
         log_path.write_text("fake eval\n")

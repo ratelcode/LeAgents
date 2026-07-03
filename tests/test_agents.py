@@ -17,6 +17,7 @@ def test_train_command_finetunes_from_init(constitution, bus, tmp_path):
     )
     assert cmd[0] == "lerobot-train"
     assert "--policy.path=lerobot/smolvla_base" in cmd
+    assert "--policy.push_to_hub=false" in cmd  # lerobot >= 0.5 refuses otherwise
     assert "--dataset.repo_id=org/data" in cmd
     assert "--steps=100" in cmd
 
@@ -57,6 +58,7 @@ def test_eval_parses_success_rate(constitution, bus, tmp_path):
         workdir=tmp_path,
     )
     assert report.success_rate == pytest.approx(0.65)
+    assert report.per_task == {"suite_a": pytest.approx(0.65)}
     assert report.task_suite == "libero_spatial"
 
 
