@@ -135,6 +135,18 @@ def cmd_dash(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_doctor(args: argparse.Namespace) -> int:
+    from leagents.doctor import run_doctor
+
+    return run_doctor()
+
+
+def cmd_setup(args: argparse.Namespace) -> int:
+    from leagents.doctor import run_setup
+
+    return run_setup(install_lerobot=args.install_lerobot)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="leagents")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -148,6 +160,14 @@ def main(argv: list[str] | None = None) -> int:
     status_p = sub.add_parser("status", help="show runs, cycles, and blessed checkpoints")
     status_p.add_argument("-w", "--workdir", default="runs")
     status_p.set_defaults(fn=cmd_status)
+
+    doctor_p = sub.add_parser("doctor", help="diagnose the environment; print exact fixes")
+    doctor_p.set_defaults(fn=cmd_doctor)
+
+    setup_p = sub.add_parser("setup", help="apply safe environment fixes (libero init, .env)")
+    setup_p.add_argument("--install-lerobot", action="store_true",
+                         help="also install leagents[lerobot] with the CMake compat env")
+    setup_p.set_defaults(fn=cmd_setup)
 
     dash_p = sub.add_parser("dash", help="serve the flow dashboard (needs 'leagents[dash]')")
     dash_p.add_argument("-w", "--workdir", default="runs")
