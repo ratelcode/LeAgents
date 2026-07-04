@@ -59,6 +59,10 @@ improve:
   episodes: 20
   adapt_steps: 2000
   device: cuda
+  # the policy expects camera1/2 — same mapping as train/eval; without it
+  # make_policy's feature check kills the harvest (scale v4 cycle 0 lesson)
+  extra_args:
+    - '--rename-map={"observation.images.image": "observation.images.camera1", "observation.images.image2": "observation.images.camera2"}'
 
 llm: null
 knowledge:

@@ -152,11 +152,19 @@ class LoopController:
                     # DexFlyWheel step 3: harvest successful rollouts from the
                     # newly blessed checkpoint (only worthwhile once it succeeds)
                     if self.improve_agent and report.success_rate > 0:
-                        rollout_mix, _ = self.improve_agent.run(
-                            run_id=run_id, cycle=cycle,
-                            checkpoint=checkpoint, workdir=workdir,
-                            prev_mix=rollout_mix,
-                        )
+                        from leagents.agents.improve_agent import ImproveError
+
+                        try:
+                            rollout_mix, _ = self.improve_agent.run(
+                                run_id=run_id, cycle=cycle,
+                                checkpoint=checkpoint, workdir=workdir,
+                                prev_mix=rollout_mix,
+                            )
+                        except ImproveError as exc:
+                            # the harvest augments the loop, it is not the
+                            # loop: a failed collection must not kill the run
+                            self.bus.emit(Event(run_id, "improve", "improve_failed",
+                                                cycle, {"error": str(exc)}))
                 elif decision is Decision.ESCALATE:
                     history = []
                     if rung_idx + 1 < len(ladder):
