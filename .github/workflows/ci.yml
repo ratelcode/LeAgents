@@ -22,3 +22,15 @@ jobs:
         run: ruff check leagents tests
       - name: Test
         run: pytest -q
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # slim build: the full torch/CUDA stack doesn't fit hosted-runner disks
+      - name: Build image (loop-only)
+        run: docker build --build-arg INSTALL_LEROBOT=0 -t leagents:ci .
+      - name: Smoke the image
+        run: |
+          docker run --rm leagents:ci pytest -q
+          docker run --rm leagents:ci leagents run -c configs/smoke_pusht.yaml --dry-run

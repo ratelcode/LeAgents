@@ -1,0 +1,32 @@
+# LeAgents services (issue #1):
+#   docker compose up loop    # the autonomous cycle (GPU)
+#   docker compose up dash    # flow dashboard → http://localhost:8321
+#
+# Secrets: put provider keys in .env next to this file (see .env.example);
+# it is optional and never copied into the image.
+services:
+  loop:
+    build: .
+    image: leagents
+    gpus: all
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - ./configs:/app/configs
+      - ./runs:/app/runs
+      - ./knowledge:/app/knowledge
+      - hf-cache:/root/.cache/huggingface
+    command: leagents run -c configs/m0_libero.yaml
+
+  dash:
+    image: leagents
+    ports:
+      - "8321:8321"
+    volumes:
+      - ./runs:/app/runs
+      - ./knowledge:/app/knowledge
+    command: leagents dash --host 0.0.0.0
+
+volumes:
+  hf-cache:
