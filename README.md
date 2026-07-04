@@ -33,6 +33,8 @@ This run validated the *loop* — budgets held, weights carried over, and the de
 
 ## Quickstart
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ratelcode/LeAgents/blob/main/notebooks/quickstart_colab.ipynb) — one autonomous cycle (PushT) on a free GPU, ~5 minutes, nothing to install locally.
+
 ```bash
 pip install -e ".[dev]"
 pytest
