@@ -43,5 +43,9 @@ def decide(
         abs(score - baseline) < thresholds.plateau_epsilon
         for score in window[-thresholds.plateau_cycles :]
     ):
+        # A plateau below the floor means the policy never got off the
+        # ground — that is under-training, not a policy ceiling.
+        if baseline < thresholds.escalate_floor:
+            return Decision.ITERATE
         return Decision.ESCALATE
     return Decision.ITERATE

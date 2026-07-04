@@ -63,6 +63,9 @@ COLLECT → TRAIN → EVAL ──▶ Δ success-rate?
                             ├─ ≥ promote threshold → PROMOTE checkpoint → IMPROVE (flywheel cycle)
                             ├─ improving but below   → ITERATE (more data on failing task variations)
                             ├─ plateaued on SmolVLA  → ESCALATE policy (--policy.type=pi05 / groot)
+                            │                          (only if baseline ≥ escalate_floor — an
+                            │                           all-zero plateau means under-training,
+                            │                           so it iterates instead)
                             └─ regressed             → ROLLBACK + flag for human review
 ```
 

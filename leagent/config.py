@@ -33,6 +33,11 @@ class ThresholdConfig(BaseModel):
     regression_delta: float = 0.05
     plateau_epsilon: float = 0.01
     plateau_cycles: int = 2
+    # A plateau only escalates the policy ladder if the baseline already
+    # clears this floor. A near-zero plateau means the policy hasn't learned
+    # anything yet (under-training / too little data) — a bigger model is
+    # not the fix, so the loop iterates instead. 0 disables the guard.
+    escalate_floor: float = 0.05
 
 
 class DataConfig(BaseModel):

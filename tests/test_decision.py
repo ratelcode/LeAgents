@@ -2,7 +2,8 @@ from leagent.config import ThresholdConfig
 from leagent.orchestrator.decision import Decision, decide
 
 T = ThresholdConfig(
-    promote_delta=0.05, regression_delta=0.05, plateau_epsilon=0.01, plateau_cycles=2
+    promote_delta=0.05, regression_delta=0.05, plateau_epsilon=0.01, plateau_cycles=2,
+    escalate_floor=0.05,
 )
 
 
@@ -24,6 +25,17 @@ def test_small_improvement_iterates():
 
 def test_plateau_escalates_policy():
     assert decide(0.505, 0.50, [0.502], T) is Decision.ESCALATE
+
+
+def test_zero_plateau_iterates_instead_of_escalating():
+    # observed in the 2026-07-04 mini-M0 run: an all-zero plateau means
+    # under-training, not a policy ceiling — do not burn GPU on a bigger model
+    assert decide(0.0, 0.0, [0.0], T) is Decision.ITERATE
+
+
+def test_escalate_floor_zero_disables_guard():
+    t = ThresholdConfig(escalate_floor=0.0)
+    assert decide(0.0, 0.0, [0.0], t) is Decision.ESCALATE
 
 
 def test_plateau_needs_enough_cycles():
