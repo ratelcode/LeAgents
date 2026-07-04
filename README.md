@@ -54,6 +54,16 @@ pip install -e ".[dash]"
 leagents dash            # → http://127.0.0.1:8321
 ```
 
+### No root, no Docker? Use pixi
+
+On shared servers the only step that needs sudo is LIBERO's `egl-probe` build (system EGL headers). [pixi](https://pixi.sh) supplies Python, the EGL/OpenGL headers, a C++ toolchain, and CMake 3.x from conda-forge instead — zero root required:
+
+```bash
+pixi run test                  # loop tests, no GPU needed
+pixi -e lerobot run doctor     # full environment checks (GPU/EGL/LIBERO)
+pixi -e lerobot run smoke-pusht
+```
+
 ## How the loop decides
 
 Each cycle trains a candidate checkpoint and evaluates it on LIBERO. The decision is a pure function of success-rate deltas vs. the blessed baseline (`leagents/orchestrator/decision.py`):

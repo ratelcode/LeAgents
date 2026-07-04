@@ -21,3 +21,4 @@ wandb/
 
 # runtime logs
 *.log
+.pixi/

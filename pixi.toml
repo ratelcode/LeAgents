@@ -1,0 +1,60 @@
+# Root-free environment for LeAgents (issue #4).
+#
+# The one step that normally requires sudo is LIBERO's egl-probe build: it
+# needs system EGL headers and a CMake that accepts its ancient CMakeLists.
+# This manifest supplies both from conda-forge — python, EGL/OpenGL headers,
+# a C++ toolchain, and CMake 3.x (CMake 4 rejects egl-probe without a
+# CMAKE_POLICY_VERSION_MINIMUM override) — so `pixi run` works on shared
+# servers and lab machines where neither sudo nor Docker is available.
+#
+#   pixi run test              # unit tests, no GPU needed
+#   pixi run dry-run           # loop state machine on synthetic scores
+#   pixi -e lerobot run doctor # full environment checks (GPU/EGL/LIBERO)
+#   pixi -e lerobot run smoke-pusht
+
+[workspace]
+name = "leagents"
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[dependencies]
+python = "3.12.*"
+pip = "*"
+# lerobot 0.5.x caps these; align the conda solve so the pypi solve succeeds
+packaging = "<26"
+setuptools = "<81"
+# EGL/OpenGL headers + vendor-neutral libs for egl-probe and headless MuJoCo
+libegl-devel = "*"
+libopengl-devel = "*"
+# toolchain for egl-probe's C++ build; CMake pinned <4 (see header note)
+cxx-compiler = "*"
+cmake = "3.*"
+make = "*"
+# video encode/decode used by LeRobotDataset v3
+ffmpeg = "*"
+
+[pypi-dependencies]
+leagents = { path = ".", editable = true, extras = ["dev", "dash"] }
+
+[feature.lerobot.dependencies]
+# prebuilt from conda-forge: evdev's source build needs newer kernel headers
+# than the conda cxx toolchain's sysroot provides
+evdev = "*"
+
+[feature.lerobot.pypi-dependencies]
+lerobot = { version = ">=0.5,<0.6", extras = ["smolvla", "libero"] }
+
+[feature.lerobot.activation.env]
+MUJOCO_GL = "egl"
+SDL_VIDEODRIVER = "dummy"
+
+[environments]
+lerobot = ["lerobot"]
+
+[tasks]
+test = "pytest"
+dry-run = "leagents run -c configs/m0_libero.yaml --dry-run"
+doctor = "leagents doctor"
+smoke-pusht = "leagents run -c configs/smoke_pusht.yaml"
+smoke-libero = "leagents run -c configs/smoke_libero.yaml"
+dash = "leagents dash"
