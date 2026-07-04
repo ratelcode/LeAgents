@@ -1,4 +1,5 @@
 from leagents.orchestrator.constitution import Constitution, ConstitutionError, Verdict
+from leagents.orchestrator.curation import CuratedProposer
 from leagents.orchestrator.decision import Decision, decide
 from leagents.orchestrator.loop import LoopController, RunSummary
 from leagents.orchestrator.proposer import (
@@ -12,6 +13,7 @@ __all__ = [
     "Constitution",
     "ConstitutionError",
     "Verdict",
+    "CuratedProposer",
     "Decision",
     "decide",
     "LoopController",

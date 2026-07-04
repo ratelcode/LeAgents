@@ -89,6 +89,18 @@ class ImproveConfig(BaseModel):
     extra_args: list[str] = Field(default_factory=list)
 
 
+class CurationConfig(BaseModel):
+    """RoboGene-style multi-stage proposal curation (DESIGN.md §3.2).
+
+    Needs `llm:` set; each cycle costs 3 LLM calls (propose K -> score ->
+    refine). Off -> the single-shot LLMProposer (or deterministic fallback).
+    """
+
+    enabled: bool = False
+    candidates: int = 3
+    max_tokens: int = 8192  # reasoning models think first; small budgets truncate the answer
+
+
 class KnowledgeConfig(BaseModel):
     """OKF knowledge layer (DESIGN.md §3.6)."""
 
@@ -107,6 +119,7 @@ class LoopConfig(BaseModel):
     knowledge: KnowledgeConfig = Field(default_factory=KnowledgeConfig)
     data: DataConfig = Field(default_factory=DataConfig)
     improve: ImproveConfig = Field(default_factory=ImproveConfig)
+    curation: CurationConfig = Field(default_factory=CurationConfig)
     policy_ladder: list[PolicyRung] = Field(
         default_factory=lambda: [
             PolicyRung(name="smolvla", init="lerobot/smolvla_base"),

@@ -23,6 +23,7 @@ from leagents.events import Event, EventBus
 from leagents.llm import make_llm
 from leagents.orchestrator import (
     Constitution,
+    CuratedProposer,
     DeterministicProposer,
     LLMProposer,
     LoopController,
@@ -74,6 +75,14 @@ def cmd_run(args: argparse.Namespace) -> int:
     knowledge_agent = (
         KnowledgeAgent(cfg.knowledge.root, bus, llm) if cfg.knowledge.enabled else None
     )
+    if cfg.curation.enabled:
+        proposer = CuratedProposer(
+            llm, cfg.knowledge.root, fallback, cfg.data,
+            candidates=cfg.curation.candidates, bus=bus,
+            max_tokens=cfg.curation.max_tokens,
+        )
+    else:
+        proposer = LLMProposer(llm, cfg.knowledge.root, fallback)
     controller = LoopController(
         cfg=cfg,
         store=store,
@@ -81,7 +90,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         data_agent=DataAgent(bus),
         train_agent=TrainAgent(cfg.train, constitution, bus, runner),
         eval_agent=EvalAgent(cfg.eval, constitution, bus, runner),
-        proposer=LLMProposer(llm, cfg.knowledge.root, fallback),
+        proposer=proposer,
         knowledge_agent=knowledge_agent,
         improve_agent=(
             ImproveAgent(cfg.improve, cfg.eval, constitution, bus, runner)
