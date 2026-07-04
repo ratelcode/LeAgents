@@ -74,6 +74,7 @@ class LoopController:
         ladder = self.cfg.policy_ladder
         rung_idx = 0
         baseline: float | None = None
+        rollout_mix = None  # accumulated successful-rollout dataset (DexFlyWheel)
         history: list[float] = []
         last_report: EvalReport | None = None
 
@@ -107,6 +108,14 @@ class LoopController:
                     run_id=run_id, cycle=cycle, rung=rung, dataset=dataset, workdir=workdir,
                     init_override=init_override,
                 )
+                # DexFlyWheel step 5: adapt on the accumulated successful-rollout
+                # mix so harvested experience feeds the next candidate
+                if rollout_mix is not None and self.cfg.improve.adapt_steps > 0:
+                    checkpoint = self.train_agent.run(
+                        run_id=run_id, cycle=cycle, rung=rung, dataset=rollout_mix,
+                        workdir=workdir, init_override=checkpoint.path,
+                        steps=self.cfg.improve.adapt_steps, stage="train_adapt",
+                    )
                 checkpoint_id = self.store.add_checkpoint(
                     run_id, cycle, checkpoint.policy_type, checkpoint.path
                 )
@@ -141,9 +150,10 @@ class LoopController:
                     # DexFlyWheel step 3: harvest successful rollouts from the
                     # newly blessed checkpoint (only worthwhile once it succeeds)
                     if self.improve_agent and report.success_rate > 0:
-                        self.improve_agent.run(
+                        rollout_mix, _ = self.improve_agent.run(
                             run_id=run_id, cycle=cycle,
                             checkpoint=checkpoint, workdir=workdir,
+                            prev_mix=rollout_mix,
                         )
                 elif decision is Decision.ESCALATE:
                     history = []

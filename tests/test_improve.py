@@ -7,7 +7,7 @@ import pytest
 from leagents.agents import ImproveAgent, ImproveError
 from leagents.agents.base import RunResult
 from leagents.config import EvalConfig, ImproveConfig
-from leagents.contracts import CheckpointRecord
+from leagents.contracts import CheckpointRecord, DatasetRef
 from leagents.orchestrator.constitution import ConstitutionError
 
 
@@ -100,6 +100,44 @@ def test_collector_helpers():
     assert features["action"]["shape"] == (7,)
 
 
+def test_merge_accumulates_rollout_mix(constitution, bus, tmp_path):
+    agent = _agent(constitution, bus,
+                   make_rollout_runner({"kept": 4, "attempts": 6}))
+    prev = DatasetRef(repo_id="local/r1-cycle0-rollouts",
+                      root=str(tmp_path / "cycle_0" / "rollouts"), num_episodes=3)
+    mix, _ = agent.run(run_id="r1", cycle=2, checkpoint=_ckpt(), workdir=tmp_path,
+                       prev_mix=prev)
+    assert mix.repo_id == "local/r1-rollouts-mix-c2"
+    assert mix.num_episodes == 7  # 3 + 4
+    assert mix.root.endswith("cycle_2/rollouts_mix")
+
+
+def test_merge_command_shape(constitution, bus, tmp_path):
+    seen = []
+
+    def spy_runner(cmd, log_path):
+        seen.append(list(cmd))
+        return make_rollout_runner({"kept": 2, "attempts": 2})(cmd, log_path)
+
+    agent = _agent(constitution, bus, spy_runner)
+    prev = DatasetRef(repo_id="local/prev-mix", root="/roots/prev", num_episodes=1)
+    agent.run(run_id="r1", cycle=1, checkpoint=_ckpt(), workdir=tmp_path, prev_mix=prev)
+    merge_cmd = seen[-1]
+    assert merge_cmd[0] == "lerobot-edit-dataset"
+    assert "--operation.type=merge" in merge_cmd
+    assert "--operation.repo_ids=[local/prev-mix, local/r1-cycle1-rollouts]" in merge_cmd
+    assert any(a.startswith("--operation.roots=[/roots/prev, ") for a in merge_cmd)
+
+
+def test_zero_kept_keeps_previous_mix(constitution, bus, tmp_path):
+    agent = _agent(constitution, bus, make_rollout_runner({"kept": 0, "attempts": 5}))
+    prev = DatasetRef(repo_id="local/prev-mix", root="/roots/prev", num_episodes=3)
+    mix, summary = agent.run(run_id="r1", cycle=1, checkpoint=_ckpt(),
+                             workdir=tmp_path, prev_mix=prev)
+    assert mix is prev  # nothing new to merge
+    assert summary["kept"] == 0
+
+
 def test_loop_dispatches_improve_on_promote(loop_config, constitution, tmp_path):
     from leagents.agents import DataAgent, EvalAgent, TrainAgent
     from leagents.events import EventBus
@@ -113,6 +151,7 @@ def test_loop_dispatches_improve_on_promote(loop_config, constitution, tmp_path)
     class SpyImprove:
         def run(self, **kwargs):
             calls.append(kwargs)
+            return DatasetRef(repo_id="local/mix", root="/mix", num_episodes=2), {}
 
     controller = LoopController(
         cfg=loop_config,
@@ -131,3 +170,46 @@ def test_loop_dispatches_improve_on_promote(loop_config, constitution, tmp_path)
     # cycle 0 promotes at 0% (baseline) -> skipped; cycle 1 promotes at 50% -> harvested
     assert len(calls) == 1
     assert calls[0]["cycle"] == 1
+
+
+def test_loop_adaptation_stage_trains_on_rollout_mix(loop_config, constitution, tmp_path):
+    from leagents.agents import DataAgent, EvalAgent, TrainAgent
+    from leagents.events import EventBus
+    from leagents.orchestrator import DeterministicProposer, LoopController
+    from leagents.store import JobStore
+    from tests.conftest import make_eval_runner, make_train_runner
+
+    bus = EventBus(tmp_path / "events.jsonl")
+    cmds: list = []
+
+    class SpyImprove:
+        def run(self, **kwargs):
+            return DatasetRef(repo_id="local/mix", root="/roots/mix", num_episodes=5), {}
+
+    loop_config.improve.adapt_steps = 500
+    loop_config.budgets.max_cycles = 2
+    controller = LoopController(
+        cfg=loop_config,
+        store=JobStore(tmp_path / "leagents.db"),
+        bus=bus,
+        data_agent=DataAgent(bus),
+        train_agent=TrainAgent(loop_config.train, constitution, bus,
+                               make_train_runner(seen_cmds=cmds)),
+        eval_agent=EvalAgent(loop_config.eval, constitution, bus,
+                             make_eval_runner([0.5, 0.6])),  # both cycles promote
+        proposer=DeterministicProposer(loop_config.seed_dataset),
+        improve_agent=SpyImprove(),
+    )
+    controller.run("run-adapt", tmp_path / "wd")
+
+    # cycle 0: one train; cycle 1: seed train + adaptation on the rollout mix
+    assert len(cmds) == 3
+    adapt = cmds[2]
+    assert "--dataset.root=/roots/mix" in adapt
+    assert "--dataset.repo_id=local/mix" in adapt
+    assert "--steps=500" in adapt
+    assert any("cycle_1/train_adapt" in a for a in adapt)
+    assert any("cycle_1/train/checkpoints/last" in a and a.startswith("--policy.path=")
+               for a in adapt)  # adapts FROM this cycle's fresh checkpoint
+    # local datasets never get an episodes subset arg
+    assert not any(a.startswith("--dataset.episodes") for a in adapt)

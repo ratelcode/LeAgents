@@ -56,7 +56,8 @@ class ImproveAgent:
         return cmd
 
     def run(
-        self, *, run_id: str, cycle: int, checkpoint: CheckpointRecord, workdir: Path
+        self, *, run_id: str, cycle: int, checkpoint: CheckpointRecord, workdir: Path,
+        prev_mix: DatasetRef | None = None,
     ) -> tuple[DatasetRef, dict]:
         out_dir = workdir / f"cycle_{cycle}" / "rollouts"
         repo_id = f"local/{run_id}-cycle{cycle}-rollouts"
@@ -82,10 +83,47 @@ class ImproveAgent:
         self.bus.emit(Event(run_id, "improve", "rollouts_collected", cycle, summary))
         ref = DatasetRef(
             repo_id=repo_id,
+            root=str(out_dir),
             num_episodes=summary.get("kept"),
             notes=f"success-filtered rollouts from cycle {cycle} blessed checkpoint",
         )
-        return ref, summary
+        if summary.get("kept", 0) == 0:
+            return (prev_mix if prev_mix else ref), summary
+        if prev_mix is None:
+            return ref, summary
+        return self._merge(run_id, cycle, workdir, prev_mix, ref), summary
+
+    def _merge(
+        self, run_id: str, cycle: int, workdir: Path, a: DatasetRef, b: DatasetRef
+    ) -> DatasetRef:
+        """Accumulate rollouts across cycles: mix_{n} = mix_{n-1} ∪ rollouts_n
+        (DexFlyWheel's growing dataset), via lerobot-edit-dataset merge."""
+        mix_repo_id = f"local/{run_id}-rollouts-mix-c{cycle}"
+        mix_root = workdir / f"cycle_{cycle}" / "rollouts_mix"
+        cmd = [
+            "lerobot-edit-dataset",
+            "--operation.type=merge",
+            f"--operation.repo_ids=[{a.repo_id}, {b.repo_id}]",
+            f"--operation.roots=[{a.root}, {b.root}]",
+            f"--new_repo_id={mix_repo_id}",
+            f"--new_root={mix_root}",
+            "--push_to_hub=false",
+        ]
+        self.bus.emit(Event(run_id, "improve", "job_started", cycle,
+                            {"cmd": cmd, "stage": "merge"}))
+        result = self.runner(cmd, mix_root.parent / "rollouts_merge.log")
+        self.bus.emit(Event(run_id, "improve", "job_finished", cycle,
+                            {"exit_code": result.exit_code, "duration_s": result.duration_s,
+                             "log": str(result.log_path)}))
+        if result.exit_code != 0:
+            raise ImproveError(f"rollout merge exited {result.exit_code}, see {result.log_path}")
+        total = (a.num_episodes or 0) + (b.num_episodes or 0)
+        merged = DatasetRef(repo_id=mix_repo_id, root=str(mix_root),
+                            num_episodes=total or None,
+                            notes=f"rollout mix through cycle {cycle}")
+        self.bus.emit(Event(run_id, "improve", "rollouts_merged", cycle,
+                            {"repo_id": mix_repo_id, "episodes": total}))
+        return merged
 
     @staticmethod
     def _parse_summary(log_path: Path | None) -> dict:

@@ -24,6 +24,7 @@ class Proposal(BaseModel):
 class DatasetRef(BaseModel):
     repo_id: str
     revision: str | None = None
+    root: str | None = None  # local dataset directory (e.g. harvested rollouts)
     num_episodes: int | None = None
     notes: str = ""
 
