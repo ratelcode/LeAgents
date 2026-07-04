@@ -9,6 +9,7 @@ data:
   initial_episodes: 8
   growth: 2.0
   max_episodes: 32
+  task_filter: libero_spatial   # match training episodes to the eval suite
 
 policy_ladder:
   - name: smolvla

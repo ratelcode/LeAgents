@@ -52,6 +52,11 @@ class DataConfig(BaseModel):
     initial_episodes: int | None = None
     growth: float = 2.0
     max_episodes: int | None = None
+    # Eval-suite name (e.g. "libero_spatial") to filter episode selection by
+    # task. Without this, the schedule takes a [0..n) prefix — which silently
+    # trains on the WRONG tasks when the dataset is suite-ordered
+    # (HuggingFaceVLA/libero is; spatial episodes live at indices ~1261+).
+    task_filter: str | None = None
 
 
 class TrainConfig(BaseModel):
@@ -89,6 +94,18 @@ class ImproveConfig(BaseModel):
     extra_args: list[str] = Field(default_factory=list)
 
 
+class CurationConfig(BaseModel):
+    """RoboGene-style multi-stage proposal curation (DESIGN.md §3.2).
+
+    Needs `llm:` set; each cycle costs 3 LLM calls (propose K -> score ->
+    refine). Off -> the single-shot LLMProposer (or deterministic fallback).
+    """
+
+    enabled: bool = False
+    candidates: int = 3
+    max_tokens: int = 8192  # reasoning models think first; small budgets truncate the answer
+
+
 class KnowledgeConfig(BaseModel):
     """OKF knowledge layer (DESIGN.md §3.6)."""
 
@@ -101,12 +118,13 @@ class LoopConfig(BaseModel):
     workdir: Path = Path("runs")
     seed_dataset: str
     # Provider-agnostic LLM spec (leagents/llm/adapter.py), e.g.
-    # "anthropic:claude-sonnet-5", "openai:gpt-5.2",
+    # "gemini:gemini-2.5-flash" (free tier), "anthropic:claude-sonnet-5", "openai:gpt-5.2",
     # "openai:qwen3@http://localhost:11434/v1". None -> deterministic fallbacks.
     llm: str | None = None
     knowledge: KnowledgeConfig = Field(default_factory=KnowledgeConfig)
     data: DataConfig = Field(default_factory=DataConfig)
     improve: ImproveConfig = Field(default_factory=ImproveConfig)
+    curation: CurationConfig = Field(default_factory=CurationConfig)
     policy_ladder: list[PolicyRung] = Field(
         default_factory=lambda: [
             PolicyRung(name="smolvla", init="lerobot/smolvla_base"),

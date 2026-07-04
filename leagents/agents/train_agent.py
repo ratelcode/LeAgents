@@ -38,11 +38,12 @@ class TrainAgent:
     ) -> list[str]:
         init = init_override or rung.init
         policy_arg = f"--policy.path={init}" if init else f"--policy.type={rung.name}"
-        episodes_args = (
-            [f"--dataset.episodes={list(range(dataset.num_episodes))}"]
-            if dataset.num_episodes and dataset.root is None
-            else []
-        )
+        if dataset.episodes is not None:
+            episodes_args = [f"--dataset.episodes={list(dataset.episodes)}"]
+        elif dataset.num_episodes and dataset.root is None:
+            episodes_args = [f"--dataset.episodes={list(range(dataset.num_episodes))}"]
+        else:
+            episodes_args = []
         root_args = [f"--dataset.root={dataset.root}"] if dataset.root else []
         return [
             "lerobot-train",

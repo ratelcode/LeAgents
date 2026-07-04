@@ -2,7 +2,7 @@
 
 Agentic orchestration for the [LeRobot](https://github.com/huggingface/lerobot) robotics pipeline — an orchestrator drives an automated **collect → train → eval → improve** loop over [LeRobotDataset v3.0](https://huggingface.co/docs/lerobot/lerobot-dataset-v3), with a deterministic loop controller, a constitution safety gate, verification gates before promotion, and (M2) a dashboard for visualizing the flow.
 
-<p align="center"><img src="docs/architecture.svg" alt="LeAgents architecture — a deterministic loop controller dispatches data/train/eval/knowledge agents over LeRobotDataset v3.0 on the Hugging Face Hub, with a constitution safety gate, an OKF knowledge wiki feeding the proposer, and a flow dashboard reading the event log" width="880"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/ratelcode/LeAgents/main/docs/architecture.svg" alt="LeAgents architecture — a deterministic loop controller dispatches data/train/eval/knowledge agents over LeRobotDataset v3.0 on the Hugging Face Hub, with a constitution safety gate, an OKF knowledge wiki feeding the proposer, and a flow dashboard reading the event log" width="880"></p>
 
 Architecture, research grounding (verified 2023–2026 papers), and roadmap: **[DESIGN.md](DESIGN.md)**.
 
@@ -10,12 +10,12 @@ Architecture, research grounding (verified 2023–2026 papers), and roadmap: **[
 
 | Milestone | Scope | Status |
 |---|---|---|
-| **M0** | Sim-only loop on LIBERO: seed dataset → SmolVLA fine-tune → `lerobot-eval` gate → promote/iterate/escalate/rollback | ✅ pipeline verified end-to-end on a real GPU (PushT + LIBERO smoke configs); full-scale training run pending |
+| **M0** | Sim-only loop on LIBERO: seed dataset → SmolVLA fine-tune → `lerobot-eval` gate → promote/iterate/escalate/rollback | ✅ done — full-scale autonomous run completed (see below); PushT/LIBERO smoke configs included |
 | **M1** | DexFlyWheel-style self-improvement, RoboGene-style task curation, policy escalation, OKF knowledge layer (Karpathy-wiki-style, DESIGN.md §3.6) + provider-agnostic LLM proposer | 🚧 knowledge layer + LLM adapter landed |
 | **M2** | Flow dashboard (Rerun episode replay, WandB curves, OTel agent traces) | 🚧 flow view v1 landed: runs → cycles → decisions live, eval chart, event log, knowledge browser (`leagents dash`) |
 | M3 | Real robot: teleop collection, HIL-SERL adapter (requires lerobot ≥ 0.6.0, see CVE note in DESIGN.md §6) | planned |
 
-What works today: the full loop state machine with budgets, the constitution gate, SQLite job store, JSONL event log, subprocess wrappers for `lerobot-train` / `lerobot-eval`, the OKF knowledge layer (`knowledge/` pages with provenance, updated every cycle, linted), the DexFlyWheel data path (success-filtered rollout harvesting → accumulated mix → adaptation training), and a provider-agnostic LLM adapter (`llm: anthropic:*|openai:*[@base_url]`, or none at all — every flow has a deterministic fallback). All covered by tests that run without a GPU or lerobot installed.
+What works today: the full loop state machine with budgets, the constitution gate, SQLite job store, JSONL event log, subprocess wrappers for `lerobot-train` / `lerobot-eval`, the OKF knowledge layer (`knowledge/` pages with provenance, updated every cycle, linted), the DexFlyWheel data path (success-filtered rollout harvesting → accumulated mix → adaptation training), and a provider-agnostic LLM adapter (`llm: gemini:*|anthropic:*|openai:*[@base_url]`, or none at all — every flow has a deterministic fallback). All covered by tests that run without a GPU or lerobot installed.
 
 ## First full-scale autonomous run (2026-07-04)
 
@@ -27,9 +27,13 @@ One M0 run on a single RTX 5070 Ti (16 GB), fully autonomous — 3 cycles, 6.1 G
 | 1 | 80 | 20k steps, continued from the blessed checkpoint | 0% | **iterate** |
 | 2 | 160 | 20k steps | 0% | **iterate** — the `escalate_floor` guard correctly refused to escalate a 0%-plateau to a bigger policy |
 
-The 0% success is the expected outcome of the data budget, not a pipeline failure: 4→16 episodes per task versus the ~50-per-variation guidance the design research verified for SmolVLA. This run validates the *loop* — budgets held, weights carried over, and the decision function behaved exactly as specified. The next run scales the data schedule to 200→500 episodes (20→50 per task).
+This run validated the *loop* — budgets held, weights carried over, and the decision function behaved exactly as specified.
+
+**Root-cause correction (same day):** the flat 0% was first attributed to the data budget (4→16 episodes per task vs. the verified ~50). Digging into a follow-up run that stayed at 0% with 20 per task exposed the real cause: **HuggingFaceVLA/libero is suite-ordered, and the `[0..N)` episode prefix belongs to *other* suites** (libero_spatial episodes live around indices 1261–1538) — every run had trained on tasks disjoint from the eval. In the metrics this silent failure was indistinguishable from under-training. Fix: episode selection is now task-filtered against the eval suite (`leagents.scripts.select_episodes`, `data.task_filter`), balanced per task, and the Data Agent fails loudly if the selection doesn't cover the suite. The table above stands as a record of the failure mode.
 
 ## Quickstart
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ratelcode/LeAgents/blob/main/notebooks/quickstart_colab.ipynb) — one autonomous cycle (PushT) on a free GPU, ~5 minutes, nothing to install locally.
 
 ```bash
 pip install -e ".[dev]"
@@ -48,6 +52,16 @@ leagents status
 # flow dashboard — runs, cycle pipeline, decisions, eval chart, events, knowledge
 pip install -e ".[dash]"
 leagents dash            # → http://127.0.0.1:8321
+```
+
+### No root, no Docker? Use pixi
+
+On shared servers the only step that needs sudo is LIBERO's `egl-probe` build (system EGL headers). [pixi](https://pixi.sh) supplies Python, the EGL/OpenGL headers, a C++ toolchain, and CMake 3.x from conda-forge instead — zero root required:
+
+```bash
+pixi run test                  # loop tests, no GPU needed
+pixi -e lerobot run doctor     # full environment checks (GPU/EGL/LIBERO)
+pixi -e lerobot run smoke-pusht
 ```
 
 ## How the loop decides

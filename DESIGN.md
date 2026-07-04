@@ -228,6 +228,8 @@ leagents/
 - **M2 — Dashboard.** Flow view + Rerun episode replay + WandB embeds + OTel traces; human-approval gates in UI.
 - **M3 — Real robot (experimental track).** Teleop collection target (~50 eps/variation), held-out real eval with success classifier + human spot-checks, HIL-SERL adapter behind a sandbox (post-CVE-fix LeRobot ≥ 0.6.0).
 
+**Backlog** — tracked as GitHub issues under the [v0.1.0 — DX & onboarding milestone](https://github.com/ratelcode/LeAgents/milestone/1): Docker image + compose + devcontainer ([#1](https://github.com/ratelcode/LeAgents/issues/1)), `leagents doctor`/`setup` self-diagnosis ([#2](https://github.com/ratelcode/LeAgents/issues/2)), Colab quickstart ([#3](https://github.com/ratelcode/LeAgents/issues/3)), pixi env for sudo-less system deps ([#4](https://github.com/ratelcode/LeAgents/issues/4)), bundled demo run ([#5](https://github.com/ratelcode/LeAgents/issues/5)).
+
 ## 9. Key references
 
 **Foundation:** [LeRobot](https://github.com/huggingface/lerobot) · [Dataset v3](https://huggingface.co/docs/lerobot/lerobot-dataset-v3) · [v0.4.0 release](https://huggingface.co/blog/lerobot-release-v040) · [SmolVLA](https://arxiv.org/abs/2506.01844) ([docs](https://huggingface.co/docs/lerobot/en/smolvla)) · [HIL-SERL docs](https://huggingface.co/docs/lerobot/hilserl)

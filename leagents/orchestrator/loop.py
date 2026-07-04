@@ -91,7 +91,9 @@ class LoopController:
 
                 # COLLECT
                 proposal = self.proposer.propose(cycle, last_report)
-                dataset = self.data_agent.run(run_id=run_id, cycle=cycle, proposal=proposal)
+                dataset = self.data_agent.run(
+                    run_id=run_id, cycle=cycle, proposal=proposal, workdir=workdir
+                )
 
                 # TRAIN — continue from the blessed checkpoint when it is the
                 # same policy (flywheel-lite: data grows, weights carry over)

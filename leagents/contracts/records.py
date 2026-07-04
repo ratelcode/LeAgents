@@ -25,6 +25,10 @@ class DatasetRef(BaseModel):
     repo_id: str
     revision: str | None = None
     root: str | None = None  # local dataset directory (e.g. harvested rollouts)
+    # Explicit episode indices (task-filtered selection). Takes precedence
+    # over num_episodes — a bare count means a [0..n) prefix, which silently
+    # picks the wrong tasks on suite-ordered datasets.
+    episodes: list[int] | None = None
     num_episodes: int | None = None
     notes: str = ""
 

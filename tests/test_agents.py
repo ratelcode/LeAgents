@@ -51,6 +51,17 @@ def test_train_command_episode_subset(constitution, bus, tmp_path):
     assert "--dataset.episodes=[0, 1, 2]" in cmd
 
 
+def test_train_command_explicit_episode_indices_win(constitution, bus, tmp_path):
+    agent = TrainAgent(TrainConfig(), constitution, bus, make_train_runner())
+    cmd = agent.build_command(
+        PolicyRung(name="smolvla", init="lerobot/smolvla_base"),
+        DatasetRef(repo_id="org/data", episodes=[1261, 1262, 1300], num_episodes=3),
+        tmp_path / "out",
+    )
+    assert "--dataset.episodes=[1261, 1262, 1300]" in cmd
+    assert "--dataset.episodes=[0, 1, 2]" not in cmd
+
+
 def test_train_run_returns_checkpoint(constitution, bus, tmp_path):
     agent = TrainAgent(TrainConfig(steps=100), constitution, bus, make_train_runner())
     record = agent.run(

@@ -15,6 +15,7 @@ data:
   initial_episodes: 40
   growth: 2.0
   max_episodes: 320
+  task_filter: libero_spatial   # match training episodes to the eval suite
 
 # Policy escalation ladder (DESIGN.md §3.3): fine-tune SmolVLA first,
 # escalate to pi0.5 when SmolVLA plateaus.

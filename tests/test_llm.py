@@ -21,3 +21,21 @@ def test_spec_without_model_rejected():
 def test_unknown_provider_rejected():
     with pytest.raises(ValueError, match="unknown LLM provider"):
         make_llm("foo:bar")
+
+
+def test_gemini_requires_key(monkeypatch):
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    with pytest.raises(ValueError, match="GEMINI_API_KEY"):
+        make_llm("gemini:gemini-2.5-flash")
+
+
+def test_gemini_builds_openai_compatible_client(monkeypatch):
+    pytest.importorskip("openai")
+    from leagents.llm import OpenAICompatibleLLM
+
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    llm = make_llm("gemini:gemini-2.5-flash")
+    assert isinstance(llm, OpenAICompatibleLLM)
+    assert llm.model == "gemini-2.5-flash"
+    assert "generativelanguage.googleapis.com" in str(llm._client.base_url)

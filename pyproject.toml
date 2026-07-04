@@ -19,7 +19,15 @@ dependencies = [
 # LeRobot moves fast (see DESIGN.md §6) — pin an exact version at install time.
 lerobot = ["lerobot[smolvla,libero]>=0.5"]
 dash = ["fastapi>=0.110", "uvicorn>=0.29"]
+# LLM adapters: `openai` covers OpenAI, Gemini (OpenAI-compatible endpoint),
+# and local Ollama/vLLM; `anthropic` covers Claude.
+llm = ["openai>=1.40", "anthropic>=0.40"]
 dev = ["pytest>=8", "ruff>=0.4", "fastapi>=0.110", "uvicorn>=0.29", "httpx>=0.27"]
+
+[project.urls]
+Repository = "https://github.com/ratelcode/LeAgents"
+Documentation = "https://github.com/ratelcode/LeAgents/blob/main/DESIGN.md"
+Changelog = "https://github.com/ratelcode/LeAgents/releases"
 
 [project.scripts]
 leagents = "leagents.cli:main"
