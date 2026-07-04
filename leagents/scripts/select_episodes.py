@@ -7,12 +7,23 @@ from under-training in the metrics. This script matches episode task strings
 against the eval suite's language instructions and balances the selection
 across tasks (the verified guidance is per-variation coverage).
 
+Shard resolution does NOT trust ``meta.episodes``'s ``data/file_index``
+column: on HuggingFaceVLA/libero that mapping is stale (it says episode 137
+lives in file-009 while the hub's file-055 actually holds it), so both
+lerobot's partial download and a mapping-based fetch pull the wrong shards
+and training dies with "Instruction 'train' corresponds to no data!".
+Instead we read each hub file's parquet FOOTER (a few KB over HTTP range
+requests) for its episode_index min/max, binary-search the region holding
+the selected episodes, download exactly those files, and then verify from
+the local files that every selected episode is actually covered.
+
 The LAST stdout line is a JSON summary the Data Agent parses.
 """
 
 from __future__ import annotations
 
 import argparse
+import bisect
 import json
 import sys
 
@@ -47,13 +58,69 @@ def select_balanced(
     return sorted(selected), counts
 
 
-def needed_files(chunk_file_pairs: list[tuple[int, int]], template: str) -> list[str]:
-    """Unique data-file paths for the selected episodes, from info.json's
-    data_path template. Pure function."""
-    return sorted({
-        template.format(chunk_index=chunk, file_index=file)
-        for chunk, file in chunk_file_pairs
-    })
+def files_covering(selected: list[int], spans: list[tuple[str, int, int]]) -> list[str]:
+    """Files whose [ep_min, ep_max] span contains at least one selected
+    episode. Pure function; preserves the order of ``spans``."""
+    ordered = sorted(selected)
+    chosen = []
+    for path, ep_min, ep_max in spans:
+        i = bisect.bisect_left(ordered, ep_min)
+        if i < len(ordered) and ordered[i] <= ep_max:
+            chosen.append(path)
+    return chosen
+
+
+def missing_episodes(selected: list[int], covered: set[int]) -> list[int]:
+    """Selected episodes not present in the covered set. Pure function."""
+    return [ep for ep in selected if ep not in covered]
+
+
+def _remote_span(fs, repo_id: str, rel_path: str) -> tuple[int, int]:
+    """episode_index min/max of a hub parquet file, from its footer only."""
+    import pyarrow.parquet as pq
+
+    with fs.open(f"datasets/{repo_id}/{rel_path}") as f:
+        md = pq.ParquetFile(f).metadata
+        col = next(k for k in range(md.num_columns)
+                   if md.schema.column(k).name == "episode_index")
+        stats = [md.row_group(g).column(col).statistics
+                 for g in range(md.num_row_groups)]
+        return min(s.min for s in stats), max(s.max for s in stats)
+
+
+def resolve_needed_files(repo_id: str, selected: list[int]) -> list[str]:
+    """Hub data files that hold the selected episodes, determined from the
+    files' own footer stats (assumes episode-monotonic file order for the
+    binary search; the caller's coverage check catches violations loudly)."""
+    from huggingface_hub import HfApi, HfFileSystem
+
+    files = sorted(p for p in HfApi().list_repo_files(repo_id, repo_type="dataset")
+                   if p.startswith("data/") and p.endswith(".parquet"))
+    if not files:
+        return []
+    fs = HfFileSystem()
+    span_cache: dict[str, tuple[int, int]] = {}
+
+    def span(rel: str) -> tuple[int, int]:
+        if rel not in span_cache:
+            span_cache[rel] = _remote_span(fs, repo_id, rel)
+        return span_cache[rel]
+
+    lo_target, hi_target = min(selected), max(selected)
+    lo, hi = 0, len(files) - 1
+    while lo < hi:  # first file whose max episode reaches the target range
+        mid = (lo + hi) // 2
+        if span(files[mid])[1] < lo_target:
+            lo = mid + 1
+        else:
+            hi = mid
+    spans = []
+    for rel in files[lo:]:
+        ep_min, ep_max = span(rel)
+        if ep_min > hi_target:
+            break
+        spans.append((rel, ep_min, ep_max))
+    return files_covering(selected, spans)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -91,23 +158,34 @@ def main(argv: list[str] | None = None) -> int:
     selected, counts = select_balanced(episode_tasks, languages, args.limit)
 
     fetched = 0
+    needed: list[str] = []
     if selected and not args.no_download:
         # lerobot skips hub sync when the local root already exists, so a
         # partially-cached dataset would load ZERO rows for these episodes
         # ("Instruction 'train' corresponds to no data!"). Ensure the shards
-        # holding the selected episodes are present in lerobot's cache.
+        # holding the selected episodes are present in lerobot's cache —
+        # resolved from footer stats, never from meta's stale file mapping.
+        import pyarrow.parquet as pq
         from huggingface_hub import hf_hub_download
 
-        chosen = frame[frame["episode_index"].isin(selected)]
-        pairs = [(int(r["data/chunk_index"]), int(r["data/file_index"]))
-                 for _, r in chosen.iterrows()]
-        template = meta.info["data_path"]
+        needed = resolve_needed_files(args.repo_id, selected)
         cache_dir = meta.root.parent.parent.parent  # snapshots/<sha> -> hub cache root
-        for rel_path in needed_files(pairs, template):
+        for rel_path in needed:
             if not (meta.root / rel_path).exists():
                 hf_hub_download(args.repo_id, rel_path, repo_type="dataset",
                                 cache_dir=cache_dir)
                 fetched += 1
+
+        covered: set[int] = set()
+        for rel_path in needed:
+            table = pq.read_table(meta.root / rel_path, columns=["episode_index"])
+            covered.update(table["episode_index"].to_pylist())
+        missing = missing_episodes(selected, covered)
+        if missing:
+            print(f"{len(missing)} selected episodes are not in the fetched "
+                  f"shards (e.g. {missing[:5]}) — the dataset's file layout "
+                  "does not match its footer stats", file=sys.stderr)
+            return 1
 
     summary = {
         "episodes": selected,
@@ -116,6 +194,7 @@ def main(argv: list[str] | None = None) -> int:
         "tasks_covered": sum(1 for c in counts.values() if c),
         "per_task": counts,
         "shards_fetched": fetched,
+        "shards_needed": len(needed),
     }
     if not selected:
         print(f"no episodes in {args.repo_id} match suite {args.suite!r} — "

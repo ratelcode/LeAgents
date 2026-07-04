@@ -4,7 +4,12 @@ from leagents.agents.data_agent import DataAgent, DataError
 from leagents.agents.base import RunResult
 from leagents.contracts import Proposal
 from leagents.events import EventBus
-from leagents.scripts.select_episodes import needed_files, normalize, select_balanced
+from leagents.scripts.select_episodes import (
+    files_covering,
+    missing_episodes,
+    normalize,
+    select_balanced,
+)
 
 import pytest
 
@@ -36,14 +41,33 @@ def test_selection_caps_at_available():
     assert selected == [1, 2, 3, 5, 6]
 
 
-def test_needed_files_unique_and_sorted():
-    template = "data/chunk-{chunk_index:03d}/file-{file_index:03d}.parquet"
-    pairs = [(0, 56), (0, 55), (0, 56), (1, 2)]
-    assert needed_files(pairs, template) == [
-        "data/chunk-000/file-055.parquet",
-        "data/chunk-000/file-056.parquet",
-        "data/chunk-001/file-002.parquet",
+SPANS = [
+    ("data/chunk-000/file-300.parquet", 1220, 1260),
+    ("data/chunk-000/file-301.parquet", 1261, 1266),
+    ("data/chunk-000/file-302.parquet", 1267, 1272),  # gap: nothing selected here
+    ("data/chunk-000/file-303.parquet", 1273, 1278),
+]
+
+
+def test_files_covering_intersects_selected_set_not_just_range():
+    selected = [1261, 1275]  # skips file-302's span entirely
+    assert files_covering(selected, SPANS) == [
+        "data/chunk-000/file-301.parquet",
+        "data/chunk-000/file-303.parquet",
     ]
+
+
+def test_files_covering_boundary_episodes():
+    assert files_covering([1260], SPANS) == ["data/chunk-000/file-300.parquet"]
+    assert files_covering([1266, 1267], SPANS) == [
+        "data/chunk-000/file-301.parquet",
+        "data/chunk-000/file-302.parquet",
+    ]
+
+
+def test_missing_episodes_detects_uncovered():
+    assert missing_episodes([1, 2, 3], {1, 3}) == [2]
+    assert missing_episodes([1, 2], {1, 2, 99}) == []
 
 
 def test_no_match_returns_empty():
