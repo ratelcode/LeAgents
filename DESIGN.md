@@ -228,6 +228,8 @@ leagents/
 - **M2 — Dashboard.** Flow view + Rerun episode replay + WandB embeds + OTel traces; human-approval gates in UI.
 - **M3 — Real robot (experimental track).** Teleop collection target (~50 eps/variation), held-out real eval with success classifier + human spot-checks, HIL-SERL adapter behind a sandbox (post-CVE-fix LeRobot ≥ 0.6.0).
 
+**Backlog** (tracked as GitHub issues): Docker packaging — a reproducible train/eval image baking in the LIBERO/EGL/CMake install fixes, plus a compose file for loop + dashboard; the same image becomes the isolation boundary the M3 gRPC paths require ([#1](https://github.com/ratelcode/LeAgents/issues/1)).
+
 ## 9. Key references
 
 **Foundation:** [LeRobot](https://github.com/huggingface/lerobot) · [Dataset v3](https://huggingface.co/docs/lerobot/lerobot-dataset-v3) · [v0.4.0 release](https://huggingface.co/blog/lerobot-release-v040) · [SmolVLA](https://arxiv.org/abs/2506.01844) ([docs](https://huggingface.co/docs/lerobot/en/smolvla)) · [HIL-SERL docs](https://huggingface.co/docs/lerobot/hilserl)
