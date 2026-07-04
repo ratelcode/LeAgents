@@ -36,7 +36,7 @@ leagents = "leagents.cli:main"
 include = ["leagents*"]
 
 [tool.setuptools.package-data]
-leagents = ["dashboard/static/*"]
+leagents = ["dashboard/static/*", "demo/data/**"]
 
 [tool.ruff]
 line-length = 100
