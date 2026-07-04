@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LeAgents — Flow</title>
+<style>
+  /* Reference dataviz palette roles; light/dark swap in one place. */
+  :root {
+    --page:        #f9f9f7;
+    --surface:     #fcfcfb;
+    --ink:         #0b0b0b;
+    --ink-2:       #52514e;
+    --muted:       #898781;
+    --grid:        #e1e0d9;
+    --baseline:    #c3c2b7;
+    --border:      rgba(11,11,11,0.10);
+    --series-1:    #2a78d6;
+    --good:        #0ca30c;
+    --warning:     #fab219;
+    --serious:     #ec835a;
+    --critical:    #d03b3b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --page:      #0d0d0d;
+      --surface:   #1a1a19;
+      --ink:       #ffffff;
+      --ink-2:     #c3c2b7;
+      --muted:     #898781;
+      --grid:      #2c2c2a;
+      --baseline:  #383835;
+      --border:    rgba(255,255,255,0.10);
+      --series-1:  #3987e5;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: var(--page); color: var(--ink);
+    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  header {
+    display: flex; align-items: baseline; gap: 10px;
+    padding: 14px 20px; border-bottom: 1px solid var(--border);
+  }
+  header h1 { font-size: 16px; font-weight: 650; }
+  header .sub { color: var(--muted); font-size: 12px; }
+  main { display: grid; grid-template-columns: 260px 1fr; gap: 16px; padding: 16px 20px; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  .panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 14px;
+  }
+  .panel h2 {
+    font-size: 11px; font-weight: 600; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 10px;
+  }
+  /* runs list */
+  #runs .run {
+    padding: 8px 10px; border-radius: 6px; cursor: pointer;
+    border: 1px solid transparent; margin-bottom: 4px;
+  }
+  #runs .run:hover { border-color: var(--border); }
+  #runs .run.sel { border-color: var(--series-1); }
+  #runs .run .id { font-size: 12.5px; word-break: break-all; }
+  #runs .run .meta { font-size: 11.5px; color: var(--muted); }
+  /* stat tiles */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 16px; }
+  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+  .tile .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  .tile .value { font-size: 22px; font-weight: 650; margin-top: 2px; }
+  .tile .value small { font-size: 12px; font-weight: 400; color: var(--ink-2); }
+  /* flow strip */
+  .cycle { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--grid); flex-wrap: wrap; }
+  .cycle:last-child { border-bottom: 0; }
+  .cycle .n { color: var(--muted); font-size: 12px; width: 56px; }
+  .stage { font-size: 12px; color: var(--ink-2); padding: 2px 8px; border: 1px solid var(--grid); border-radius: 999px; }
+  .stage.active { border-color: var(--series-1); color: var(--ink); }
+  .arrow { color: var(--muted); font-size: 11px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--border); }
+  .chip .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .rate { margin-left: auto; font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  /* chart */
+  #chart-wrap { position: relative; }
+  #tooltip {
+    position: absolute; display: none; pointer-events: none; z-index: 2;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+    padding: 6px 9px; font-size: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.15);
+    white-space: nowrap;
+  }
+  #tooltip .v { font-weight: 650; font-variant-numeric: tabular-nums; }
+  svg text { font-family: inherit; }
+  /* events */
+  #events {
+    font: 11.5px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+    max-height: 260px; overflow-y: auto; white-space: pre-wrap; word-break: break-all;
+    color: var(--ink-2);
+  }
+  #events .k { color: var(--ink); }
+  /* videos */
+  .vid-label { font-size: 12px; color: var(--muted); margin: 6px 0 4px; }
+  .vid-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .vid { margin: 0; }
+  .vid video { width: 220px; max-width: 100%; border-radius: 6px; background: #000; display: block; }
+  .vid figcaption { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  /* knowledge */
+  #kn-list { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  #kn-list button {
+    font: inherit; font-size: 12px; padding: 3px 10px; border-radius: 999px;
+    border: 1px solid var(--border); background: none; color: var(--ink-2); cursor: pointer;
+  }
+  #kn-list button.sel { border-color: var(--series-1); color: var(--ink); }
+  #kn-body { font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; color: var(--ink-2); max-height: 300px; overflow-y: auto; }
+  .empty { color: var(--muted); font-size: 12.5px; }
+  .col { display: flex; flex-direction: column; gap: 16px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>LeAgents</h1>
+  <span class="sub">collect → train → eval → decide · flow dashboard</span>
+  <span class="sub" id="clock" style="margin-left:auto"></span>
+</header>
+<main>
+  <div class="panel"><h2>Runs</h2><div id="runs"><div class="empty">no runs yet</div></div></div>
+  <div class="col">
+    <div class="tiles" id="tiles"></div>
+    <div class="panel"><h2>Cycles</h2><div id="cycles"><div class="empty">select a run</div></div></div>
+    <div class="panel"><h2>Eval success rate by cycle</h2>
+      <div id="chart-wrap"><div id="tooltip"></div><div id="chart"><div class="empty">no eval data yet</div></div></div>
+    </div>
+    <div class="panel"><h2>Eval rollouts</h2><div id="videos"><div class="empty">no rollout videos yet</div></div></div>
+    <div class="panel"><h2>Events</h2><div id="events"></div></div>
+    <div class="panel"><h2>Knowledge</h2><div id="kn-list"></div><div id="kn-body" class="empty">no pages yet</div></div>
+  </div>
+</main>
+<script>
+"use strict";
+// decision -> status role (color never alone: every chip carries symbol + word)
+const DECISION = {
+  promote:  { color: "var(--good)",     sym: "✓" },
+  iterate:  { color: "var(--ink-2)",    sym: "↻" },
+  escalate: { color: "var(--warning)",  sym: "↑" },
+  rollback: { color: "var(--serious)",  sym: "⟲" },
+  failed:   { color: "var(--critical)", sym: "!" },
+};
+const STAGES = ["collect", "train", "eval", "decide"];
+let selected = null, eventsCursor = 0, knSelected = null, knPages = [], lastVideosJson = "";
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const pct = (x) => (x * 100).toFixed(1) + "%";
+
+async function j(url) { const r = await fetch(url); return r.ok ? r.json() : null; }
+
+function chip(decision) {
+  const d = DECISION[decision] || DECISION.iterate;
+  return `<span class="chip"><span class="dot" style="background:${d.color}"></span>${d.sym} ${esc(decision)}</span>`;
+}
+
+function renderRuns(runs) {
+  if (!runs.length) { $("runs").innerHTML = '<div class="empty">no runs yet</div>'; return; }
+  $("runs").innerHTML = runs.slice().reverse().map((r) => `
+    <div class="run ${r.id === selected ? "sel" : ""}" data-id="${esc(r.id)}">
+      <div class="id">${esc(r.id)}</div>
+      <div class="meta">${esc(r.status)} · ${r.cycles.length} cycle${r.cycles.length === 1 ? "" : "s"}</div>
+    </div>`).join("");
+  for (const el of $("runs").querySelectorAll(".run"))
+    el.onclick = () => { selected = el.dataset.id; eventsCursor = 0; $("events").textContent = ""; refresh(); };
+}
+
+function renderDetail(d) {
+  const rates = d.checkpoints.filter((c) => c.success_rate != null);
+  const baseline = d.blessed && rates.find((c) => c.id === d.blessed.id);
+  $("tiles").innerHTML = [
+    ["cycles", `${d.cycles.length}<small> / ${d.config?.budgets?.max_cycles ?? "?"}</small>`],
+    ["gpu time", `${(d.gpu_seconds / 3600).toFixed(2)}<small> h</small>`],
+    ["baseline success", baseline ? pct(baseline.success_rate) : "—"],
+    ["blessed policy", d.blessed ? esc(d.blessed.policy_type) : "—"],
+    ["status", esc(d.status)],
+  ].map(([l, v]) => `<div class="tile"><div class="label">${l}</div><div class="value">${v}</div></div>`).join("");
+
+  $("cycles").innerHTML = d.cycles.length ? d.cycles.map((c) => {
+    const ckpt = d.checkpoints.find((k) => k.cycle_idx === c.idx);
+    const done = c.stage === "done";
+    const stages = STAGES.map((s) => {
+      const active = !done && c.stage === s;
+      return `<span class="stage ${active ? "active" : ""}">${s}</span>`;
+    }).join('<span class="arrow">→</span>');
+    return `<div class="cycle"><span class="n">cycle ${c.idx}</span>${stages}
+      ${c.decision ? chip(c.decision) : (d.status === "failed" ? chip("failed") : "")}
+      <span class="rate">${ckpt && ckpt.success_rate != null ? "success " + pct(ckpt.success_rate) : ""}</span></div>`;
+  }).join("") : '<div class="empty">no cycles yet</div>';
+
+  renderChart(rates.map((c) => ({ x: "c" + c.cycle_idx, y: c.success_rate })));
+}
+
+// Single-series bar chart (series-1). Thin bars, 4px rounded top anchored to
+// the baseline, >=2px gaps, hairline grid, hover tooltip, direct label on the
+// max bar only. Single series -> the panel title names it; no legend box.
+function renderChart(data) {
+  if (!data.length) { $("chart").innerHTML = '<div class="empty">no eval data yet</div>'; return; }
+  const W = Math.min(720, Math.max(320, data.length * 64)), H = 180;
+  const padL = 40, padB = 24, padT = 12, plotW = W - padL - 8, plotH = H - padT - padB;
+  const max = Math.max(0.1, ...data.map((d) => d.y));
+  const bw = Math.min(28, Math.max(10, plotW / data.length - 8));
+  const maxIdx = data.findIndex((d) => d.y === Math.max(...data.map((p) => p.y)));
+  const ticks = [0, 0.5, 1].map((f) => f * max);
+  let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px" role="img" aria-label="Eval success rate by cycle">`;
+  for (const t of ticks) {
+    const y = padT + plotH - (t / max) * plotH;
+    svg += `<line x1="${padL}" x2="${W - 8}" y1="${y}" y2="${y}" stroke="var(--grid)" stroke-width="1"/>` +
+           `<text x="${padL - 6}" y="${y + 4}" text-anchor="end" font-size="11" fill="var(--muted)" style="font-variant-numeric:tabular-nums">${Math.round(t * 100)}%</text>`;
+  }
+  data.forEach((d, i) => {
+    const x = padL + (i + 0.5) * (plotW / data.length) - bw / 2;
+    const h = Math.max(1.5, (d.y / max) * plotH);
+    const y = padT + plotH - h;
+    const r = Math.min(4, h);
+    svg += `<path d="M${x},${y + h} L${x},${y + r} Q${x},${y} ${x + r},${y} L${x + bw - r},${y} Q${x + bw},${y} ${x + bw},${y + r} L${x + bw},${y + h} Z"
+              fill="var(--series-1)" data-i="${i}" class="bar" style="cursor:default"/>`;
+    if (i === maxIdx && d.y > 0)
+      svg += `<text x="${x + bw / 2}" y="${y - 5}" text-anchor="middle" font-size="11" fill="var(--ink-2)">${pct(d.y)}</text>`;
+    svg += `<text x="${x + bw / 2}" y="${H - 8}" text-anchor="middle" font-size="11" fill="var(--muted)">${esc(d.x)}</text>`;
+    // hover hit target wider than the mark
+    svg += `<rect x="${x - 8}" y="${padT}" width="${bw + 16}" height="${plotH}" fill="transparent" data-i="${i}" class="hit"/>`;
+  });
+  svg += `<line x1="${padL}" x2="${W - 8}" y1="${padT + plotH}" y2="${padT + plotH}" stroke="var(--baseline)" stroke-width="1"/></svg>`;
+  $("chart").innerHTML = svg;
+  const tip = $("tooltip");
+  for (const el of $("chart").querySelectorAll(".hit")) {
+    el.onmousemove = (ev) => {
+      const d = data[+el.dataset.i];
+      tip.innerHTML = `${esc(d.x)} · <span class="v">${pct(d.y)}</span>`;
+      tip.style.display = "block";
+      const box = $("chart-wrap").getBoundingClientRect();
+      tip.style.left = Math.min(ev.clientX - box.left + 12, box.width - tip.offsetWidth - 4) + "px";
+      tip.style.top = ev.clientY - box.top - 34 + "px";
+    };
+    el.onmouseleave = () => { tip.style.display = "none"; };
+  }
+}
+
+function renderVideos(groups) {
+  // only touch the DOM when the list changes — re-rendering reloads <video>s
+  const key = JSON.stringify(groups);
+  if (key === lastVideosJson) return;
+  lastVideosJson = key;
+  const withVideos = groups.filter((g) => g.videos.length);
+  if (!withVideos.length) { $("videos").innerHTML = '<div class="empty">no rollout videos yet</div>'; return; }
+  $("videos").innerHTML = withVideos.map((g) => `
+    <div class="vid-label">cycle ${g.cycle}</div>
+    <div class="vid-row">${g.videos.map((v) => `
+      <figure class="vid">
+        <video src="/api/video?path=${encodeURIComponent(v)}" controls preload="metadata"></video>
+        <figcaption>${esc(v.split("/").pop())}</figcaption>
+      </figure>`).join("")}
+    </div>`).join("");
+}
+
+function renderEvents(batch) {
+  if (!batch.length) return;
+  const el = $("events");
+  const stick = el.scrollHeight - el.scrollTop - el.clientHeight < 30;
+  el.innerHTML += batch.map((e) => {
+    const c = e.cycle != null ? `c${e.cycle}` : "–";
+    return `<div>[${c}] <span class="k">${esc(e.stage)}/${esc(e.kind)}</span> ${esc(JSON.stringify(e.payload)).slice(0, 220)}</div>`;
+  }).join("");
+  if (stick) el.scrollTop = el.scrollHeight;
+}
+
+function renderKnowledge(pages) {
+  knPages = pages;
+  if (!pages.length) { $("kn-list").innerHTML = ""; $("kn-body").textContent = "no pages yet"; return; }
+  if (knSelected == null || !pages.some((p) => p.path === knSelected)) knSelected = pages[0].path;
+  $("kn-list").innerHTML = pages.map((p) =>
+    `<button class="${p.path === knSelected ? "sel" : ""}" data-p="${esc(p.path)}">${esc(p.path)}</button>`).join("");
+  for (const b of $("kn-list").querySelectorAll("button"))
+    b.onclick = () => { knSelected = b.dataset.p; renderKnowledge(knPages); };
+  $("kn-body").textContent = pages.find((p) => p.path === knSelected)?.content ?? "";
+}
+
+async function refresh() {
+  const runs = (await j("/api/runs")) || [];
+  if (!selected && runs.length) selected = runs[runs.length - 1].id;
+  renderRuns(runs);
+  if (selected) {
+    const d = await j(`/api/runs/${encodeURIComponent(selected)}`);
+    if (d) renderDetail(d);
+    const ev = await j(`/api/runs/${encodeURIComponent(selected)}/events?after=${eventsCursor}`);
+    if (ev) { renderEvents(ev.events); eventsCursor = ev.next; }
+    renderVideos((await j(`/api/runs/${encodeURIComponent(selected)}/videos`)) || []);
+  }
+  renderKnowledge((await j("/api/knowledge")) || []);
+  $("clock").textContent = "updated " + new Date().toLocaleTimeString();
+}
+
+refresh();
+setInterval(refresh, 2500);
+</script>
+</body>
+</html>

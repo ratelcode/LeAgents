@@ -19,6 +19,6 @@ jobs:
       - name: Install
         run: pip install -e ".[dev]"
       - name: Lint
-        run: ruff check leloop tests
+        run: ruff check leagents tests
       - name: Test
         run: pytest -q

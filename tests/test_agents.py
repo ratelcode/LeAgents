@@ -1,9 +1,9 @@
 import pytest
 
-from leloop.agents import EvalAgent, TrainAgent
-from leloop.config import EvalConfig, PolicyRung, TrainConfig
-from leloop.contracts import CheckpointRecord, DatasetRef
-from leloop.orchestrator.constitution import ConstitutionError
+from leagents.agents import EvalAgent, TrainAgent
+from leagents.config import EvalConfig, PolicyRung, TrainConfig
+from leagents.contracts import CheckpointRecord, DatasetRef
+from leagents.orchestrator.constitution import ConstitutionError
 from tests.conftest import make_eval_runner, make_train_runner
 
 

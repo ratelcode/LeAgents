@@ -1,8 +1,8 @@
-from leloop.store import JobStore
+from leagents.store import JobStore
 
 
 def test_run_cycle_checkpoint_roundtrip(tmp_path):
-    store = JobStore(tmp_path / "leloop.db")
+    store = JobStore(tmp_path / "leagents.db")
     store.create_run("run1", "{}")
     store.start_cycle("run1", 0)
     store.set_stage("run1", 0, "train")

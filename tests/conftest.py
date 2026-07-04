@@ -3,10 +3,10 @@ from pathlib import Path
 
 import pytest
 
-from leloop.agents.base import RunResult
-from leloop.config import LoopConfig
-from leloop.events import EventBus
-from leloop.orchestrator.constitution import Constitution
+from leagents.agents.base import RunResult
+from leagents.config import LoopConfig
+from leagents.events import EventBus
+from leagents.orchestrator.constitution import Constitution
 
 
 def _arg(cmd, prefix: str) -> str:

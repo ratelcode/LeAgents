@@ -1,6 +1,6 @@
 # Knowledge base schema (Layer 3)
 
-This directory is LeLoop's knowledge base — an [OKF](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md)-shaped bundle of markdown pages with YAML frontmatter, maintained by the Knowledge Agent (`leloop/agents/knowledge_agent.py`) and readable/editable by humans and any agent (DESIGN.md §3.6).
+This directory is LeAgents's knowledge base — an [OKF](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md)-shaped bundle of markdown pages with YAML frontmatter, maintained by the Knowledge Agent (`leagents/agents/knowledge_agent.py`) and readable/editable by humans and any agent (DESIGN.md §3.6).
 
 ## Layers
 
