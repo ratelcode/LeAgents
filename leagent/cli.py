@@ -107,6 +107,20 @@ def cmd_status(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_dash(args: argparse.Namespace) -> int:
+    try:
+        import uvicorn
+
+        from leagent.dashboard.server import create_app
+    except ImportError:
+        print("the dashboard needs extra dependencies: pip install 'leagent[dash]'")
+        return 1
+    app = create_app(Path(args.workdir), Path(args.knowledge))
+    print(f"leagent dashboard → http://{args.host}:{args.port}")
+    uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="leagent")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -120,6 +134,13 @@ def main(argv: list[str] | None = None) -> int:
     status_p = sub.add_parser("status", help="show runs, cycles, and blessed checkpoints")
     status_p.add_argument("-w", "--workdir", default="runs")
     status_p.set_defaults(fn=cmd_status)
+
+    dash_p = sub.add_parser("dash", help="serve the flow dashboard (needs 'leagent[dash]')")
+    dash_p.add_argument("-w", "--workdir", default="runs")
+    dash_p.add_argument("-k", "--knowledge", default="knowledge")
+    dash_p.add_argument("--host", default="127.0.0.1")
+    dash_p.add_argument("--port", type=int, default=8321)
+    dash_p.set_defaults(fn=cmd_dash)
 
     args = parser.parse_args(argv)
     return int(args.fn(args))

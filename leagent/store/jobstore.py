@@ -119,6 +119,12 @@ class JobStore:
             self._conn.execute("UPDATE checkpoints SET blessed = 0 WHERE run_id = ?", (run_id,))
             self._conn.execute("UPDATE checkpoints SET blessed = 1 WHERE id = ?", (checkpoint_id,))
 
+    def checkpoints_for(self, run_id: str) -> list[dict[str, Any]]:
+        rows = self._conn.execute(
+            "SELECT * FROM checkpoints WHERE run_id = ? ORDER BY cycle_idx", (run_id,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
     def blessed_checkpoint(self, run_id: str) -> dict[str, Any] | None:
         row = self._conn.execute(
             "SELECT * FROM checkpoints WHERE run_id = ? AND blessed = 1", (run_id,)

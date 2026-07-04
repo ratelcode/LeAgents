@@ -170,7 +170,9 @@ The research pass produced *no verified claims* comparing Claude Agent SDK / Lan
 
 ---
 
-## 5. Dashboard & observability  **[recommendation — unverified leg; validate during M3]**
+## 5. Dashboard & observability  **[flow view v1 implemented July 2026; embeds still recommendations]**
+
+*Status: the flow view ships as FastAPI + one static page with no build step (`leagent dash`, `leagent/dashboard/`) — runs → cycles → decisions live via polling, per-cycle eval chart, event log, knowledge browser. The API is the stable surface; a React shell and the Rerun/WandB/OTel embeds below remain planned.*
 
 One pane, four views, backed by an event bus (every agent emits structured events to the job store; dashboard reads it):
 
