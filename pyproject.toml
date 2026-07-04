@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "leagent"
 version = "0.0.4"
-description = "Agentic orchestration for the LeRobot pipeline: collect -> train -> eval -> improve"
+description = "LeAgent — agentic orchestration for the LeRobot pipeline: collect -> train -> eval -> improve"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }

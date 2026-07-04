@@ -116,7 +116,7 @@ def cmd_dash(args: argparse.Namespace) -> int:
         print("the dashboard needs extra dependencies: pip install 'leagent[dash]'")
         return 1
     app = create_app(Path(args.workdir), Path(args.knowledge))
-    print(f"leagent dashboard → http://{args.host}:{args.port}")
+    print(f"LeAgent dashboard → http://{args.host}:{args.port}")
     uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
     return 0
 

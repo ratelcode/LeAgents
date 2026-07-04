@@ -41,7 +41,7 @@ thresholds:
 # action-chunking policies (empty batches on 0.5.1) — DESIGN.md §3.3.
 train:
   steps: 20000
-  batch_size: 16
+  batch_size: 8   # verified on a 16GB RTX 5070 Ti (~0.4s/step); raise on bigger cards
   continue_from_blessed: true
   extra_args:
     - --policy.device=cuda

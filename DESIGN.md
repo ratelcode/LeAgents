@@ -1,8 +1,8 @@
-# leagent — Agentic LeRobot Pipeline
+# LeAgent — Agentic LeRobot Pipeline
 
 **Design document · July 2026**
 
-`leagent` turns the LeRobot (Hugging Face) robotics pipeline — data collection, training, and evaluation — into an agentic system: an orchestration agent coordinates specialist agents through an automated **collect → train → eval → improve** loop, with a dashboard for visualizing the whole flow.
+**LeAgent** turns the LeRobot (Hugging Face) robotics pipeline — data collection, training, and evaluation — into an agentic system: an orchestration agent coordinates specialist agents through an automated **collect → train → eval → improve** loop, with a dashboard for visualizing the whole flow.
 
 This design is grounded in a deep-research pass (July 2026) over the LeRobot codebase/docs and 2023–2026 papers. Claims marked **[verified]** survived 3-vote adversarial fact-checking against primary sources; items marked **[recommendation]** are design choices that were *not* independently verified and should be validated during implementation.
 
@@ -15,7 +15,7 @@ This design is grounded in a deep-research pass (July 2026) over the LeRobot cod
 - **[verified]** **LeRobotDataset v3.0** (Parquet + MP4 shards, episode boundaries in relational metadata, Hub-native streaming via `StreamingLeRobotDataset`) is a single, documented data contract every pipeline stage can read and write (`create → add_frame → save_episode → finalize → push_to_hub`). ([docs](https://huggingface.co/docs/lerobot/lerobot-dataset-v3))
 - **[verified]** The agentic-loop pattern has real precedents: **AutoRT** ran LLM/VLM-orchestrated collection on 20+ robots for 7 months (77k episodes, 6,650 tasks); **RoboGen** (ICML 2024) demonstrated the propose-generate-learn cycle; **DexFlyWheel** (NeurIPS 2025) closed the self-improvement loop, scaling 1 demo/task → 2,000+ demos.
 
-What no one has shipped as **open source glue**: these loop patterns wired onto LeRobot's CLI + dataset contract with an observable dashboard. That is leagent's niche.
+What no one has shipped as **open source glue**: these loop patterns wired onto LeRobot's CLI + dataset contract with an observable dashboard. That is LeAgent's niche.
 
 ---
 
@@ -69,7 +69,7 @@ COLLECT → TRAIN → EVAL ──▶ Δ success-rate?
                             └─ regressed             → ROLLBACK + flag for human review
 ```
 
-**Design rule from the research:** the one claim that *failed* adversarial verification was "RoboGen works as an unbounded, unattended data flywheel" (refuted 1–2; sim-only, needs supervision, skill verification is an acknowledged bottleneck). Therefore leagent **builds in verification gates and human checkpoints** at every loop boundary — auto-iterate within a budget, but promotion to a "blessed" checkpoint and constitution changes always require human approval.
+**Design rule from the research:** the one claim that *failed* adversarial verification was "RoboGen works as an unbounded, unattended data flywheel" (refuted 1–2; sim-only, needs supervision, skill verification is an acknowledged bottleneck). Therefore LeAgent **builds in verification gates and human checkpoints** at every loop boundary — auto-iterate within a budget, but promotion to a "blessed" checkpoint and constitution changes always require human approval.
 
 ---
 
@@ -77,7 +77,7 @@ COLLECT → TRAIN → EVAL ──▶ Δ success-rate?
 
 ### 3.1 Orchestrator Agent
 
-Precedent: **AutoRT** (DeepMind, [arXiv:2401.12963](https://arxiv.org/abs/2401.12963)) — **[verified]** LLM task proposal + VLM scene grounding + a *robot constitution* safety filter ran a real fleet (52 robots, 7 months, 77k episodes). Note its qualification: LLM guidance operated at the orchestration/task-proposal level with human oversight retained — leagent adopts the same posture.
+Precedent: **AutoRT** (DeepMind, [arXiv:2401.12963](https://arxiv.org/abs/2401.12963)) — **[verified]** LLM task proposal + VLM scene grounding + a *robot constitution* safety filter ran a real fleet (52 robots, 7 months, 77k episodes). Note its qualification: LLM guidance operated at the orchestration/task-proposal level with human oversight retained — LeAgent adopts the same posture.
 
 Responsibilities:
 - **Task proposal**: LLM proposes the next tasks/variations to collect, conditioned on eval failures and dataset coverage stats.
@@ -133,9 +133,9 @@ Verified result: from **1 human demo per task → 2,000+ successful demos across
 
 **Problem it solves:** without this layer the loop accumulates *data* (events, checkpoints, eval reports) but not *lessons*. The self-improvement flywheel (§3.5) grows the dataset; the knowledge layer grows the system's understanding of *why* runs succeed or fail, and feeds that back into task proposal.
 
-**Structure — Karpathy's three layers mapped onto leagent:**
+**Structure — Karpathy's three layers mapped onto LeAgent:**
 
-| Layer | Karpathy LLM Wiki | leagent |
+| Layer | Karpathy LLM Wiki | LeAgent |
 |---|---|---|
 | 1 — Raw sources (immutable; LLM reads, never edits) | curated documents | already exists: `events.jsonl`, eval reports, train logs, SQLite run history |
 | 2 — The wiki (LLM-owned, interlinked markdown) | entity/concept pages | `knowledge/` — an **OKF bundle** (markdown + YAML frontmatter): per-**task** pages (failure modes, data strategies that worked), per-**policy** pages (e.g. "SmolVLA needs ~50 episodes per variation; 25 failed"), per-**experiment** lesson pages | 
@@ -189,8 +189,8 @@ Human-approval gates (checkpoint promotion, constitution edits, real-robot dispa
 
 ## 6. Security & operational caveats (from verified research)
 
-1. **CVE-2026-25874** — critical unauthenticated **RCE via `pickle.loads()` in LeRobot's async-inference gRPC path** (validated on v0.4.3; fix slated for v0.6.0). leagent must **avoid or sandbox async-inference** until ≥ v0.6.0: never expose the gRPC port beyond localhost, run inference workers in a container with no secrets. The HIL-SERL actor-learner path is also gRPC — same network posture applies.
-2. **Maintenance risk** — LeRobot founders left HF in Dec 2025; project continues under a new tech lead who calls it "primarily a research and prototyping tool." Production hardening (retries, validation, sandboxing) is leagent's responsibility. Pin LeRobot versions; the project moves fast (v0.4.0 Oct 2025 → v0.5.1 Apr 2026; re-check format/policy roster at implementation time).
+1. **CVE-2026-25874** — critical unauthenticated **RCE via `pickle.loads()` in LeRobot's async-inference gRPC path** (validated on v0.4.3; fix slated for v0.6.0). LeAgent must **avoid or sandbox async-inference** until ≥ v0.6.0: never expose the gRPC port beyond localhost, run inference workers in a container with no secrets. The HIL-SERL actor-learner path is also gRPC — same network posture applies.
+2. **Maintenance risk** — LeRobot founders left HF in Dec 2025; project continues under a new tech lead who calls it "primarily a research and prototyping tool." Production hardening (retries, validation, sandboxing) is LeAgent's responsibility. Pin LeRobot versions; the project moves fast (v0.4.0 Oct 2025 → v0.5.1 Apr 2026; re-check format/policy roster at implementation time).
 3. **Sim-to-real honesty** — headline amplification numbers (350×/500×) are **simulation-side**; real transfer was demonstrated per-task only. Dashboard must display sim and real metrics separately; never let sim success promote a real-robot checkpoint.
 4. **Dataset v3 rough edges** — see §3.3; default to local cache + Hub sync.
 

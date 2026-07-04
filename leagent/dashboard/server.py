@@ -37,7 +37,7 @@ def create_app(workdir: Path, knowledge_root: Path):
     workdir = Path(workdir)
     knowledge_root = Path(knowledge_root)
     db_path = workdir / "leagent.db"
-    app = FastAPI(title="leagent dashboard")
+    app = FastAPI(title="LeAgent dashboard")
 
     def store() -> JobStore:
         # one short-lived connection per request: sqlite connections are not
@@ -85,6 +85,35 @@ def create_app(workdir: Path, knowledge_root: Path):
             "blessed": s.blessed_checkpoint(run_id),
             "gpu_seconds": _gpu_seconds(workdir / run_id / "events.jsonl"),
         }
+
+    @app.get("/api/runs/{run_id}/videos")
+    def run_videos(run_id: str) -> list[dict[str, Any]]:
+        """Eval rollout videos per cycle, from eval_info.json's video_paths."""
+        s = store()
+        groups = []
+        for ckpt in s.checkpoints_for(run_id):
+            if not ckpt.get("eval_json"):
+                continue
+            raw = json.loads(ckpt["eval_json"]).get("raw") or {}
+            paths = list((raw.get("overall") or {}).get("video_paths") or [])
+            for task in raw.get("per_task") or []:
+                paths.extend((task.get("metrics") or {}).get("video_paths") or [])
+            unique = list(dict.fromkeys(paths))
+            groups.append({"cycle": ckpt["cycle_idx"], "videos": unique})
+        return groups
+
+    @app.get("/api/video")
+    def video(path: str):
+        """Serve one rollout mp4. Paths in eval_info.json are relative to the
+        loop's cwd (the workdir's parent); anything outside workdir is refused."""
+        from fastapi.responses import FileResponse
+
+        base = workdir.resolve()
+        candidate = Path(path)
+        candidate = (candidate if candidate.is_absolute() else base.parent / candidate).resolve()
+        if base not in candidate.parents or candidate.suffix != ".mp4" or not candidate.exists():
+            raise HTTPException(404, "video not found")
+        return FileResponse(candidate, media_type="video/mp4")
 
     @app.get("/api/runs/{run_id}/events")
     def run_events(run_id: str, after: int = 0, limit: int = 200) -> dict[str, Any]:

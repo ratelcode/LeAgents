@@ -1,10 +1,10 @@
-# leagent
+# LeAgent
 
 Agentic orchestration for the [LeRobot](https://github.com/huggingface/lerobot) robotics pipeline — an orchestrator drives an automated **collect → train → eval → improve** loop over [LeRobotDataset v3.0](https://huggingface.co/docs/lerobot/lerobot-dataset-v3), with a deterministic loop controller, a constitution safety gate, verification gates before promotion, and (M2) a dashboard for visualizing the flow.
 
 Architecture, research grounding (verified 2023–2026 papers), and roadmap: **[DESIGN.md](DESIGN.md)**.
 
-## Status — v0.0.2
+## Status — v0.0.4
 
 | Milestone | Scope | Status |
 |---|---|---|
