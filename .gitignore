@@ -15,3 +15,6 @@ wandb/
 
 # misc
 .DS_Store
+
+# runtime logs
+*.log
