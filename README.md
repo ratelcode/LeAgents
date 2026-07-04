@@ -64,6 +64,15 @@ pixi -e lerobot run doctor     # full environment checks (GPU/EGL/LIBERO)
 pixi -e lerobot run smoke-pusht
 ```
 
+### Docker
+
+The image bakes in everything that takes debugging natively — EGL headers for LIBERO's `egl-probe` build, CMake < 4, libero's one-time init, headless sim env vars. GPU access needs [nvidia-container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html); secrets come from `.env` at runtime, never the image:
+
+```bash
+docker compose up dash    # flow dashboard → http://localhost:8321
+docker compose up loop    # the autonomous cycle (GPU)
+```
+
 ## How the loop decides
 
 Each cycle trains a candidate checkpoint and evaluates it on LIBERO. The decision is a pure function of success-rate deltas vs. the blessed baseline (`leagents/orchestrator/decision.py`):
