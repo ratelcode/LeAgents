@@ -4,7 +4,7 @@ from leagents.agents.data_agent import DataAgent, DataError
 from leagents.agents.base import RunResult
 from leagents.contracts import Proposal
 from leagents.events import EventBus
-from leagents.scripts.select_episodes import normalize, select_balanced
+from leagents.scripts.select_episodes import needed_files, normalize, select_balanced
 
 import pytest
 
@@ -34,6 +34,16 @@ def test_selection_excludes_other_suites_and_balances():
 def test_selection_caps_at_available():
     selected, _ = select_balanced(EPISODES, SUITE, limit=100)
     assert selected == [1, 2, 3, 5, 6]
+
+
+def test_needed_files_unique_and_sorted():
+    template = "data/chunk-{chunk_index:03d}/file-{file_index:03d}.parquet"
+    pairs = [(0, 56), (0, 55), (0, 56), (1, 2)]
+    assert needed_files(pairs, template) == [
+        "data/chunk-000/file-055.parquet",
+        "data/chunk-000/file-056.parquet",
+        "data/chunk-001/file-002.parquet",
+    ]
 
 
 def test_no_match_returns_empty():

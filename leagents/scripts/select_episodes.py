@@ -47,11 +47,22 @@ def select_balanced(
     return sorted(selected), counts
 
 
+def needed_files(chunk_file_pairs: list[tuple[int, int]], template: str) -> list[str]:
+    """Unique data-file paths for the selected episodes, from info.json's
+    data_path template. Pure function."""
+    return sorted({
+        template.format(chunk_index=chunk, file_index=file)
+        for chunk, file in chunk_file_pairs
+    })
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-id", required=True)
     parser.add_argument("--suite", required=True, help="e.g. libero_spatial")
     parser.add_argument("--limit", type=int, required=True)
+    parser.add_argument("--no-download", action="store_true",
+                        help="skip ensuring the selected episodes' shards are local")
     return parser
 
 
@@ -78,12 +89,33 @@ def main(argv: list[str] | None = None) -> int:
     ]
 
     selected, counts = select_balanced(episode_tasks, languages, args.limit)
+
+    fetched = 0
+    if selected and not args.no_download:
+        # lerobot skips hub sync when the local root already exists, so a
+        # partially-cached dataset would load ZERO rows for these episodes
+        # ("Instruction 'train' corresponds to no data!"). Ensure the shards
+        # holding the selected episodes are present in lerobot's cache.
+        from huggingface_hub import hf_hub_download
+
+        chosen = frame[frame["episode_index"].isin(selected)]
+        pairs = [(int(r["data/chunk_index"]), int(r["data/file_index"]))
+                 for _, r in chosen.iterrows()]
+        template = meta.info["data_path"]
+        cache_dir = meta.root.parent.parent.parent  # snapshots/<sha> -> hub cache root
+        for rel_path in needed_files(pairs, template):
+            if not (meta.root / rel_path).exists():
+                hf_hub_download(args.repo_id, rel_path, repo_type="dataset",
+                                cache_dir=cache_dir)
+                fetched += 1
+
     summary = {
         "episodes": selected,
         "selected": len(selected),
         "suite_tasks": len(languages),
         "tasks_covered": sum(1 for c in counts.values() if c),
         "per_task": counts,
+        "shards_fetched": fetched,
     }
     if not selected:
         print(f"no episodes in {args.repo_id} match suite {args.suite!r} — "
