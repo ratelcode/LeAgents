@@ -1,0 +1,67 @@
+# Scale run: the first run sized to actually move success rate.
+# Data reaches the research-verified ~50 episodes per task (500 total over
+# libero_spatial's 10 tasks), weights carry over between cycles, and the
+# full DexFlyWheel path is armed: on any promotion with success > 0, harvest
+# success-filtered rollouts, merge them into a growing mix, and adapt on it
+# at the start of the next cycle. (~8 h on one 16 GB GPU.)
+run_name: m0-libero-scale
+workdir: runs
+seed_dataset: HuggingFaceVLA/libero
+
+data:
+  initial_episodes: 200   # 20 per task
+  growth: 1.6             # 200 -> 320 -> 500 (capped)
+  max_episodes: 500       # ~50 per task, the verified SmolVLA guidance
+
+policy_ladder:
+  - name: smolvla
+    init: lerobot/smolvla_base
+  - name: pi05
+    init: lerobot/pi05_base
+
+budgets:
+  max_cycles: 3
+  max_gpu_hours: 12
+
+thresholds:
+  promote_delta: 0.05
+  regression_delta: 0.05
+  plateau_epsilon: 0.01
+  plateau_cycles: 2
+  escalate_floor: 0.05
+
+train:
+  steps: 20000
+  batch_size: 8
+  continue_from_blessed: true
+  extra_args:
+    - --policy.device=cuda
+    - --save_freq=5000
+    - --log_freq=100
+    - '--rename_map={"observation.images.image": "observation.images.camera1", "observation.images.image2": "observation.images.camera2"}'
+
+eval:
+  env_type: libero
+  task_suite: libero_spatial
+  n_episodes: 10   # per task on LIBERO -> 100 episodes per eval
+  batch_size: 2    # parallel envs; 5 OOMs a 16 GB card
+  extra_args:
+    - --policy.device=cuda
+    - '--rename_map={"observation.images.image": "observation.images.camera1", "observation.images.image2": "observation.images.camera2"}'
+
+# DexFlyWheel armed: harvest on promotion (success > 0), adapt next cycle.
+# NOTE: harvested rollouts store a generic task string ("libero:<suite>/<id>"),
+# not LIBERO's language instructions — acceptable for adaptation, revisit
+# when the collector learns to read env task descriptions.
+improve:
+  enabled: true
+  episodes: 20
+  adapt_steps: 2000
+  device: cuda
+
+llm: null
+knowledge:
+  enabled: true
+  root: knowledge
+
+constitution: configs/constitution.yaml
