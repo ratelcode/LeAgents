@@ -2,6 +2,8 @@
 
 Agentic orchestration for the [LeRobot](https://github.com/huggingface/lerobot) robotics pipeline — an orchestrator drives an automated **collect → train → eval → improve** loop over [LeRobotDataset v3.0](https://huggingface.co/docs/lerobot/lerobot-dataset-v3), with a deterministic loop controller, a constitution safety gate, verification gates before promotion, and (M2) a dashboard for visualizing the flow.
 
+<p align="center"><img src="docs/architecture.svg" alt="LeAgent architecture — a deterministic loop controller dispatches data/train/eval/knowledge agents over LeRobotDataset v3.0 on the Hugging Face Hub, with a constitution safety gate, an OKF knowledge wiki feeding the proposer, and a flow dashboard reading the event log" width="880"></p>
+
 Architecture, research grounding (verified 2023–2026 papers), and roadmap: **[DESIGN.md](DESIGN.md)**.
 
 ## Status — v0.0.4
