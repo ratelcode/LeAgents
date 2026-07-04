@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "leagent"
+name = "leloop"
 version = "0.0.4"
-description = "LeAgent — agentic orchestration for the LeRobot pipeline: collect -> train -> eval -> improve"
+description = "LeLoop — agentic orchestration for the LeRobot pipeline: collect -> train -> eval -> improve"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
@@ -22,13 +22,13 @@ dash = ["fastapi>=0.110", "uvicorn>=0.29"]
 dev = ["pytest>=8", "ruff>=0.4", "fastapi>=0.110", "uvicorn>=0.29", "httpx>=0.27"]
 
 [project.scripts]
-leagent = "leagent.cli:main"
+leloop = "leloop.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["leagent*"]
+include = ["leloop*"]
 
 [tool.setuptools.package-data]
-leagent = ["dashboard/static/*"]
+leloop = ["dashboard/static/*"]
 
 [tool.ruff]
 line-length = 100

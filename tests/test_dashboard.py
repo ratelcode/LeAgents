@@ -6,14 +6,14 @@ fastapi = pytest.importorskip("fastapi")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from leagent.dashboard.server import create_app  # noqa: E402
-from leagent.store import JobStore  # noqa: E402
+from leloop.dashboard.server import create_app  # noqa: E402
+from leloop.store import JobStore  # noqa: E402
 
 
 @pytest.fixture
 def client(tmp_path):
     workdir = tmp_path / "runs"
-    store = JobStore(workdir / "leagent.db")
+    store = JobStore(workdir / "leloop.db")
     video_rel = "runs/run1/cycle_0/eval/videos/ep0.mp4"
     video_file = tmp_path / video_rel
     video_file.parent.mkdir(parents=True)
@@ -49,7 +49,7 @@ def client(tmp_path):
 def test_index_serves_page(client):
     response = client.get("/")
     assert response.status_code == 200
-    assert "LeAgent" in response.text
+    assert "LeLoop" in response.text
 
 
 def test_runs_endpoint(client):

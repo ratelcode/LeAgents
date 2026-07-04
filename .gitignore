@@ -8,7 +8,7 @@ build/
 .pytest_cache/
 .ruff_cache/
 
-# leagent runtime artifacts
+# leloop runtime artifacts
 runs/
 outputs/
 wandb/

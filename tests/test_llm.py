@@ -1,6 +1,6 @@
 import pytest
 
-from leagent.llm import NullLLM, make_llm
+from leloop.llm import NullLLM, make_llm
 
 
 def test_no_spec_gives_null_llm():

@@ -1,5 +1,5 @@
-from leagent.config import ThresholdConfig
-from leagent.orchestrator.decision import Decision, decide
+from leloop.config import ThresholdConfig
+from leloop.orchestrator.decision import Decision, decide
 
 T = ThresholdConfig(
     promote_delta=0.05, regression_delta=0.05, plateau_epsilon=0.01, plateau_cycles=2,
@@ -49,7 +49,7 @@ def test_noisy_history_does_not_plateau():
 
 
 def test_proposer_episode_growth():
-    from leagent.orchestrator import DeterministicProposer
+    from leloop.orchestrator import DeterministicProposer
 
     proposer = DeterministicProposer("org/seed", initial_episodes=8, growth=2.0,
                                      max_episodes=20)
@@ -59,6 +59,6 @@ def test_proposer_episode_growth():
 
 
 def test_proposer_full_dataset_by_default():
-    from leagent.orchestrator import DeterministicProposer
+    from leloop.orchestrator import DeterministicProposer
 
     assert DeterministicProposer("org/seed").propose(0, None).num_episodes is None

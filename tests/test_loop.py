@@ -1,16 +1,16 @@
 """End-to-end loop tests with fake runners — no lerobot, no GPU."""
 
-from leagent.agents import DataAgent, EvalAgent, KnowledgeAgent, TrainAgent
-from leagent.events import EventBus
-from leagent.orchestrator import DeterministicProposer, LoopController
-from leagent.store import JobStore
+from leloop.agents import DataAgent, EvalAgent, KnowledgeAgent, TrainAgent
+from leloop.events import EventBus
+from leloop.orchestrator import DeterministicProposer, LoopController
+from leloop.store import JobStore
 from tests.conftest import make_eval_runner, make_train_runner
 
 
 def _controller(loop_config, constitution, tmp_path, eval_scores, knowledge_root=None,
                 seen_train_cmds=None):
     bus = EventBus(tmp_path / "events.jsonl")
-    store = JobStore(tmp_path / "leagent.db")
+    store = JobStore(tmp_path / "leloop.db")
     controller = LoopController(
         cfg=loop_config,
         store=store,

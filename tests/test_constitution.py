@@ -1,6 +1,6 @@
 import pytest
 
-from leagent.orchestrator.constitution import Constitution
+from leloop.orchestrator.constitution import Constitution
 
 
 @pytest.fixture

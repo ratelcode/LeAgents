@@ -1,8 +1,8 @@
 import yaml
 
-from leagent.agents import KnowledgeAgent
-from leagent.contracts import EvalReport
-from leagent.events import EventBus
+from leloop.agents import KnowledgeAgent
+from leloop.contracts import EvalReport
+from leloop.events import EventBus
 
 
 class FakeLLM:

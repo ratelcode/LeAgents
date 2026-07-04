@@ -1,4 +1,4 @@
-from leagent.orchestrator import DeterministicProposer, LLMProposer
+from leloop.orchestrator import DeterministicProposer, LLMProposer
 from tests.test_knowledge import FakeLLM
 
 

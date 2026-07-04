@@ -12,7 +12,7 @@
   <rect x="0" y="0" width="920" height="560" rx="14" fill="#fcfcfb" stroke="#e1e0d9"/>
 
   <!-- title + decision legend -->
-  <text x="32" y="42" font-size="21" font-weight="700" fill="#0b0b0b">LeAgent</text>
+  <text x="32" y="42" font-size="21" font-weight="700" fill="#0b0b0b">LeLoop</text>
   <text x="130" y="42" font-size="12.5" fill="#52514e">deterministic loop · agents propose, a pure function decides</text>
   <g font-size="11" fill="#52514e">
     <circle cx="556" cy="38" r="4" fill="#0ca30c"/><text x="565" y="42">promote</text>
@@ -107,5 +107,5 @@
   <line x1="570" y1="466" x2="570" y2="498" stroke="#898781" stroke-width="1.4" marker-end="url(#ag)"/>
   <rect x="32" y="500" width="856" height="40" rx="8" fill="#eef4fc" stroke="#c9ddf5"/>
   <text x="46" y="525" font-size="12" font-weight="600" fill="#0b0b0b">Dashboard</text>
-  <text x="128" y="525" font-size="10.5" fill="#52514e">leagent dash — live cycle pipeline · decisions · eval success chart · rollout videos · event log · knowledge browser</text>
+  <text x="128" y="525" font-size="10.5" fill="#52514e">leloop dash — live cycle pipeline · decisions · eval success chart · rollout videos · event log · knowledge browser</text>
 </svg>

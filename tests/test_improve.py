@@ -4,11 +4,11 @@ from pathlib import Path
 
 import pytest
 
-from leagent.agents import ImproveAgent, ImproveError
-from leagent.agents.base import RunResult
-from leagent.config import EvalConfig, ImproveConfig
-from leagent.contracts import CheckpointRecord
-from leagent.orchestrator.constitution import ConstitutionError
+from leloop.agents import ImproveAgent, ImproveError
+from leloop.agents.base import RunResult
+from leloop.config import EvalConfig, ImproveConfig
+from leloop.contracts import CheckpointRecord
+from leloop.orchestrator.constitution import ConstitutionError
 
 
 def make_rollout_runner(summary: dict, chatter: str = "attempt 1: suite/0 success=True\n"):
@@ -37,7 +37,7 @@ def _agent(constitution, bus, runner, improve_cfg=None, eval_cfg=None):
 def test_command_shape(constitution, bus, tmp_path):
     agent = _agent(constitution, bus, make_rollout_runner({"kept": 3, "attempts": 5}))
     cmd = agent.build_command(_ckpt(), tmp_path / "rollouts", "local/r-c0-rollouts")
-    assert cmd[:3] == [sys.executable, "-m", "leagent.scripts.collect_rollouts"]
+    assert cmd[:3] == [sys.executable, "-m", "leloop.scripts.collect_rollouts"]
     assert "--policy-path=/ckpt/blessed" in cmd
     assert "--env-type=pusht" in cmd and "--task=PushT-v0" in cmd
     assert "--episodes=5" in cmd and "--device=cpu" in cmd
@@ -74,7 +74,7 @@ def test_denied_env_refused(constitution, bus, tmp_path):
 
 def test_collector_helpers():
     torch = pytest.importorskip("torch")
-    from leagent.scripts.collect_rollouts import (
+    from leloop.scripts.collect_rollouts import (
         chw_float_to_hwc_uint8,
         features_from_rollout,
         first_done_index,
@@ -101,10 +101,10 @@ def test_collector_helpers():
 
 
 def test_loop_dispatches_improve_on_promote(loop_config, constitution, tmp_path):
-    from leagent.agents import DataAgent, EvalAgent, TrainAgent
-    from leagent.events import EventBus
-    from leagent.orchestrator import DeterministicProposer, LoopController
-    from leagent.store import JobStore
+    from leloop.agents import DataAgent, EvalAgent, TrainAgent
+    from leloop.events import EventBus
+    from leloop.orchestrator import DeterministicProposer, LoopController
+    from leloop.store import JobStore
     from tests.conftest import make_eval_runner, make_train_runner
 
     bus = EventBus(tmp_path / "events.jsonl")
@@ -116,7 +116,7 @@ def test_loop_dispatches_improve_on_promote(loop_config, constitution, tmp_path)
 
     controller = LoopController(
         cfg=loop_config,
-        store=JobStore(tmp_path / "leagent.db"),
+        store=JobStore(tmp_path / "leloop.db"),
         bus=bus,
         data_agent=DataAgent(bus),
         train_agent=TrainAgent(loop_config.train, constitution, bus, make_train_runner()),
