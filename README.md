@@ -39,6 +39,10 @@ This run validated the *loop* — budgets held, weights carried over, and the de
 pip install -e ".[dev]"
 pytest
 
+# instant demo — installs a bundled real 3-cycle run (events, decisions,
+# eval videos, knowledge pages) so the dashboard is never empty. No GPU.
+leagents demo
+
 # dry run — no GPU, no lerobot; synthetic eval scores exercise the decision logic
 leagents run -c configs/m0_libero.yaml --dry-run
 
