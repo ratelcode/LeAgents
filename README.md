@@ -15,7 +15,19 @@ Architecture, research grounding (verified 2023–2026 papers), and roadmap: **[
 | **M2** | Flow dashboard (Rerun episode replay, WandB curves, OTel agent traces) | 🚧 flow view v1 landed: runs → cycles → decisions live, eval chart, event log, knowledge browser (`leagents dash`) |
 | M3 | Real robot: teleop collection, HIL-SERL adapter (requires lerobot ≥ 0.6.0, see CVE note in DESIGN.md §6) | planned |
 
-What works today: the full loop state machine with budgets, the constitution gate, SQLite job store, JSONL event log, subprocess wrappers for `lerobot-train` / `lerobot-eval`, the OKF knowledge layer (`knowledge/` pages with provenance, updated every cycle, linted), and a provider-agnostic LLM adapter (`llm: anthropic:*|openai:*[@base_url]`, or none at all — every flow has a deterministic fallback). All covered by tests that run without a GPU or lerobot installed.
+What works today: the full loop state machine with budgets, the constitution gate, SQLite job store, JSONL event log, subprocess wrappers for `lerobot-train` / `lerobot-eval`, the OKF knowledge layer (`knowledge/` pages with provenance, updated every cycle, linted), the DexFlyWheel data path (success-filtered rollout harvesting → accumulated mix → adaptation training), and a provider-agnostic LLM adapter (`llm: anthropic:*|openai:*[@base_url]`, or none at all — every flow has a deterministic fallback). All covered by tests that run without a GPU or lerobot installed.
+
+## First full-scale autonomous run (2026-07-04)
+
+One M0 run on a single RTX 5070 Ti (16 GB), fully autonomous — 3 cycles, 6.1 GPU-hours, zero human intervention, every decision/event/knowledge-page update logged:
+
+| Cycle | Data | Train | LIBERO spatial eval (100 episodes) | Decision |
+|---|---|---|---|---|
+| 0 | 40 episodes | 20k steps from `smolvla_base` (loss → 0.030) | 0% success — arm reaches targets, never completes | **promote** (baseline) |
+| 1 | 80 | 20k steps, continued from the blessed checkpoint | 0% | **iterate** |
+| 2 | 160 | 20k steps | 0% | **iterate** — the `escalate_floor` guard correctly refused to escalate a 0%-plateau to a bigger policy |
+
+The 0% success is the expected outcome of the data budget, not a pipeline failure: 4→16 episodes per task versus the ~50-per-variation guidance the design research verified for SmolVLA. This run validates the *loop* — budgets held, weights carried over, and the decision function behaved exactly as specified. The next run scales the data schedule to 200→500 episodes (20→50 per task).
 
 ## Quickstart
 
