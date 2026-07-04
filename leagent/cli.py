@@ -12,6 +12,7 @@ from pathlib import Path
 from leagent.agents import (
     DataAgent,
     EvalAgent,
+    ImproveAgent,
     KnowledgeAgent,
     TrainAgent,
     dry_runner,
@@ -82,6 +83,10 @@ def cmd_run(args: argparse.Namespace) -> int:
         eval_agent=EvalAgent(cfg.eval, constitution, bus, runner),
         proposer=LLMProposer(llm, cfg.knowledge.root, fallback),
         knowledge_agent=knowledge_agent,
+        improve_agent=(
+            ImproveAgent(cfg.improve, cfg.eval, constitution, bus, runner)
+            if cfg.improve.enabled else None
+        ),
     )
     if args.dry_run:
         print(f"DRY RUN — commands are logged to {workdir}, nothing is executed.")

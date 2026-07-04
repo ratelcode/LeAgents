@@ -58,7 +58,7 @@ def make_eval_runner(scores: list[float], duration_s: float = 60.0):
 def constitution() -> Constitution:
     return Constitution(
         {
-            "allowed_env_types": ["libero", "metaworld"],
+            "allowed_env_types": ["libero", "metaworld", "pusht"],  # mirrors configs/constitution.yaml
             "max_train_steps": 200_000,
             "max_eval_episodes": 500,
             "forbidden_commands": ["lerobot-record", "lerobot-async-inference"],

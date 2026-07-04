@@ -71,6 +71,21 @@ class EvalConfig(BaseModel):
     extra_args: list[str] = Field(default_factory=list)
 
 
+class ImproveConfig(BaseModel):
+    """DexFlyWheel rollout collection after each promotion (DESIGN.md §3.5).
+
+    Off by default: it costs GPU time and only makes sense once the policy
+    succeeds sometimes (success-filtered collection of a 0% policy keeps
+    nothing).
+    """
+
+    enabled: bool = False
+    episodes: int = 20  # successful episodes to keep per promotion
+    device: str = "cuda"
+    task_text: str | None = None  # language instruction stored per frame
+    extra_args: list[str] = Field(default_factory=list)
+
+
 class KnowledgeConfig(BaseModel):
     """OKF knowledge layer (DESIGN.md §3.6)."""
 
@@ -88,6 +103,7 @@ class LoopConfig(BaseModel):
     llm: str | None = None
     knowledge: KnowledgeConfig = Field(default_factory=KnowledgeConfig)
     data: DataConfig = Field(default_factory=DataConfig)
+    improve: ImproveConfig = Field(default_factory=ImproveConfig)
     policy_ladder: list[PolicyRung] = Field(
         default_factory=lambda: [
             PolicyRung(name="smolvla", init="lerobot/smolvla_base"),

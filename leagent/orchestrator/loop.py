@@ -21,6 +21,7 @@ from leagent.store import JobStore
 if TYPE_CHECKING:  # runtime import would be circular: agents depend on orchestrator
     from leagent.agents.data_agent import DataAgent
     from leagent.agents.eval_agent import EvalAgent
+    from leagent.agents.improve_agent import ImproveAgent
     from leagent.agents.knowledge_agent import KnowledgeAgent
     from leagent.agents.train_agent import TrainAgent
 
@@ -49,6 +50,7 @@ class LoopController:
         eval_agent: EvalAgent,
         proposer: Proposer,
         knowledge_agent: KnowledgeAgent | None = None,
+        improve_agent: ImproveAgent | None = None,
     ):
         self.cfg = cfg
         self.store = store
@@ -58,6 +60,7 @@ class LoopController:
         self.eval_agent = eval_agent
         self.proposer = proposer
         self.knowledge_agent = knowledge_agent
+        self.improve_agent = improve_agent
         self._job_seconds = 0.0
         bus.subscribe(self._track_budget)
 
@@ -135,6 +138,13 @@ class LoopController:
                     baseline = report.success_rate
                     history = []
                     self.store.bless(run_id, checkpoint_id)
+                    # DexFlyWheel step 3: harvest successful rollouts from the
+                    # newly blessed checkpoint (only worthwhile once it succeeds)
+                    if self.improve_agent and report.success_rate > 0:
+                        self.improve_agent.run(
+                            run_id=run_id, cycle=cycle,
+                            checkpoint=checkpoint, workdir=workdir,
+                        )
                 elif decision is Decision.ESCALATE:
                     history = []
                     if rung_idx + 1 < len(ladder):

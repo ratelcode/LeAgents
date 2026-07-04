@@ -1,20 +1,102 @@
-"""Improvement Agent — DexFlyWheel cycle placeholder (M1, DESIGN.md §3.5).
+"""Improvement Agent — DexFlyWheel step 3: success-filtered rollout collection
+(M1, DESIGN.md §3.5).
 
-The M1 implementation runs: residual RL on the frozen base policy →
-success-filtered rollout collection → augmentation → expanded dataset
-for the next cycle's base policy.
+Runs the blessed policy in sim via ``leagent.scripts.collect_rollouts`` (a
+subprocess, like every other agent) and keeps only successful episodes as a
+new LeRobotDataset. Residual-RL (flywheel step 2) and merging the rollout
+dataset into the training mix are the remaining M1 work.
 """
 
 from __future__ import annotations
 
-from leagent.events import EventBus
+import json
+import sys
+from pathlib import Path
+
+from leagent.agents.base import Runner, subprocess_runner
+from leagent.config import EvalConfig, ImproveConfig
+from leagent.contracts import CheckpointRecord, DatasetRef
+from leagent.events import Event, EventBus
+from leagent.orchestrator.constitution import Constitution, ConstitutionError
+
+
+class ImproveError(Exception):
+    pass
 
 
 class ImproveAgent:
-    def __init__(self, bus: EventBus):
+    def __init__(
+        self,
+        cfg: ImproveConfig,
+        eval_cfg: EvalConfig,
+        constitution: Constitution,
+        bus: EventBus,
+        runner: Runner = subprocess_runner,
+    ):
+        self.cfg = cfg
+        self.eval_cfg = eval_cfg
+        self.constitution = constitution
         self.bus = bus
+        self.runner = runner
 
-    def run(self, **kwargs: object) -> None:
-        raise NotImplementedError(
-            "DexFlyWheel improvement cycle lands in M1 (see DESIGN.md §3.5, §8)"
+    def build_command(self, checkpoint: CheckpointRecord, out_dir: Path, repo_id: str) -> list[str]:
+        cmd = [
+            sys.executable, "-m", "leagent.scripts.collect_rollouts",
+            f"--policy-path={checkpoint.path}",
+            f"--env-type={self.eval_cfg.env_type}",
+            f"--task={self.eval_cfg.task_suite}",
+            f"--episodes={self.cfg.episodes}",
+            f"--out={out_dir}",
+            f"--repo-id={repo_id}",
+            f"--device={self.cfg.device}",
+            *self.cfg.extra_args,
+        ]
+        if self.cfg.task_text:
+            cmd.append(f"--task-text={self.cfg.task_text}")
+        return cmd
+
+    def run(
+        self, *, run_id: str, cycle: int, checkpoint: CheckpointRecord, workdir: Path
+    ) -> tuple[DatasetRef, dict]:
+        out_dir = workdir / f"cycle_{cycle}" / "rollouts"
+        repo_id = f"local/{run_id}-cycle{cycle}-rollouts"
+        cmd = self.build_command(checkpoint, out_dir, repo_id)
+
+        for verdict in (self.constitution.check_eval(self.eval_cfg.env_type, self.cfg.episodes),
+                        self.constitution.check_command(cmd)):
+            if not verdict.allowed:
+                self.bus.emit(Event(run_id, "improve", "constitution_denied", cycle,
+                                    {"rule": verdict.rule, "reason": verdict.reason}))
+                raise ConstitutionError(verdict)
+
+        self.bus.emit(Event(run_id, "improve", "job_started", cycle, {"cmd": cmd}))
+        result = self.runner(cmd, out_dir.parent / "rollouts.log")
+        self.bus.emit(Event(run_id, "improve", "job_finished", cycle,
+                            {"exit_code": result.exit_code, "duration_s": result.duration_s,
+                             "log": str(result.log_path)}))
+        if result.exit_code != 0:
+            raise ImproveError(f"rollout collection exited {result.exit_code}, "
+                               f"see {result.log_path}")
+
+        summary = self._parse_summary(result.log_path)
+        self.bus.emit(Event(run_id, "improve", "rollouts_collected", cycle, summary))
+        ref = DatasetRef(
+            repo_id=repo_id,
+            num_episodes=summary.get("kept"),
+            notes=f"success-filtered rollouts from cycle {cycle} blessed checkpoint",
         )
+        return ref, summary
+
+    @staticmethod
+    def _parse_summary(log_path: Path | None) -> dict:
+        """The collector prints a JSON summary as its LAST stdout line."""
+        if log_path is None or not Path(log_path).exists():
+            raise ImproveError(f"rollout log missing: {log_path}")
+        for line in reversed(Path(log_path).read_text().splitlines()):
+            line = line.strip()
+            if line.startswith("{"):
+                try:
+                    return json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+        raise ImproveError(f"no JSON summary found in {log_path}")
