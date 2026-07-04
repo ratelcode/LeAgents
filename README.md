@@ -10,12 +10,12 @@ Architecture, research grounding (verified 2023–2026 papers), and roadmap: **[
 
 | Milestone | Scope | Status |
 |---|---|---|
-| **M0** | Sim-only loop on LIBERO: seed dataset → SmolVLA fine-tune → `lerobot-eval` gate → promote/iterate/escalate/rollback | ✅ pipeline verified end-to-end on a real GPU (PushT + LIBERO smoke configs); full-scale training run pending |
+| **M0** | Sim-only loop on LIBERO: seed dataset → SmolVLA fine-tune → `lerobot-eval` gate → promote/iterate/escalate/rollback | ✅ done — full-scale autonomous run completed (see below); PushT/LIBERO smoke configs included |
 | **M1** | DexFlyWheel-style self-improvement, RoboGene-style task curation, policy escalation, OKF knowledge layer (Karpathy-wiki-style, DESIGN.md §3.6) + provider-agnostic LLM proposer | 🚧 knowledge layer + LLM adapter landed |
 | **M2** | Flow dashboard (Rerun episode replay, WandB curves, OTel agent traces) | 🚧 flow view v1 landed: runs → cycles → decisions live, eval chart, event log, knowledge browser (`leagents dash`) |
 | M3 | Real robot: teleop collection, HIL-SERL adapter (requires lerobot ≥ 0.6.0, see CVE note in DESIGN.md §6) | planned |
 
-What works today: the full loop state machine with budgets, the constitution gate, SQLite job store, JSONL event log, subprocess wrappers for `lerobot-train` / `lerobot-eval`, the OKF knowledge layer (`knowledge/` pages with provenance, updated every cycle, linted), the DexFlyWheel data path (success-filtered rollout harvesting → accumulated mix → adaptation training), and a provider-agnostic LLM adapter (`llm: anthropic:*|openai:*[@base_url]`, or none at all — every flow has a deterministic fallback). All covered by tests that run without a GPU or lerobot installed.
+What works today: the full loop state machine with budgets, the constitution gate, SQLite job store, JSONL event log, subprocess wrappers for `lerobot-train` / `lerobot-eval`, the OKF knowledge layer (`knowledge/` pages with provenance, updated every cycle, linted), the DexFlyWheel data path (success-filtered rollout harvesting → accumulated mix → adaptation training), and a provider-agnostic LLM adapter (`llm: gemini:*|anthropic:*|openai:*[@base_url]`, or none at all — every flow has a deterministic fallback). All covered by tests that run without a GPU or lerobot installed.
 
 ## First full-scale autonomous run (2026-07-04)
 

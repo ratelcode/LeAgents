@@ -101,7 +101,7 @@ class LoopConfig(BaseModel):
     workdir: Path = Path("runs")
     seed_dataset: str
     # Provider-agnostic LLM spec (leagents/llm/adapter.py), e.g.
-    # "anthropic:claude-sonnet-5", "openai:gpt-5.2",
+    # "gemini:gemini-2.5-flash" (free tier), "anthropic:claude-sonnet-5", "openai:gpt-5.2",
     # "openai:qwen3@http://localhost:11434/v1". None -> deterministic fallbacks.
     llm: str | None = None
     knowledge: KnowledgeConfig = Field(default_factory=KnowledgeConfig)
