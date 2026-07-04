@@ -12,6 +12,7 @@ data:
   initial_episodes: 200   # 20 per task
   growth: 1.6             # 200 -> 320 -> 500 (capped)
   max_episodes: 500       # ~50 per task, the verified SmolVLA guidance
+  task_filter: libero_spatial   # match training episodes to the eval suite
 
 policy_ladder:
   - name: smolvla

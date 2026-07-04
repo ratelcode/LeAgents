@@ -87,7 +87,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         cfg=cfg,
         store=store,
         bus=bus,
-        data_agent=DataAgent(bus),
+        data_agent=DataAgent(bus, runner, task_filter=cfg.data.task_filter),
         train_agent=TrainAgent(cfg.train, constitution, bus, runner),
         eval_agent=EvalAgent(cfg.eval, constitution, bus, runner),
         proposer=proposer,

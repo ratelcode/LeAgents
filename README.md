@@ -27,7 +27,9 @@ One M0 run on a single RTX 5070 Ti (16 GB), fully autonomous — 3 cycles, 6.1 G
 | 1 | 80 | 20k steps, continued from the blessed checkpoint | 0% | **iterate** |
 | 2 | 160 | 20k steps | 0% | **iterate** — the `escalate_floor` guard correctly refused to escalate a 0%-plateau to a bigger policy |
 
-The 0% success is the expected outcome of the data budget, not a pipeline failure: 4→16 episodes per task versus the ~50-per-variation guidance the design research verified for SmolVLA. This run validates the *loop* — budgets held, weights carried over, and the decision function behaved exactly as specified. The next run scales the data schedule to 200→500 episodes (20→50 per task).
+This run validated the *loop* — budgets held, weights carried over, and the decision function behaved exactly as specified.
+
+**Root-cause correction (same day):** the flat 0% was first attributed to the data budget (4→16 episodes per task vs. the verified ~50). Digging into a follow-up run that stayed at 0% with 20 per task exposed the real cause: **HuggingFaceVLA/libero is suite-ordered, and the `[0..N)` episode prefix belongs to *other* suites** (libero_spatial episodes live around indices 1261–1538) — every run had trained on tasks disjoint from the eval. In the metrics this silent failure was indistinguishable from under-training. Fix: episode selection is now task-filtered against the eval suite (`leagents.scripts.select_episodes`, `data.task_filter`), balanced per task, and the Data Agent fails loudly if the selection doesn't cover the suite. The table above stands as a record of the failure mode.
 
 ## Quickstart
 

@@ -52,6 +52,11 @@ class DataConfig(BaseModel):
     initial_episodes: int | None = None
     growth: float = 2.0
     max_episodes: int | None = None
+    # Eval-suite name (e.g. "libero_spatial") to filter episode selection by
+    # task. Without this, the schedule takes a [0..n) prefix — which silently
+    # trains on the WRONG tasks when the dataset is suite-ordered
+    # (HuggingFaceVLA/libero is; spatial episodes live at indices ~1261+).
+    task_filter: str | None = None
 
 
 class TrainConfig(BaseModel):
