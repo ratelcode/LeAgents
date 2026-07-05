@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "leagents"
-version = "0.0.4"
+version = "0.0.5"
 description = "LeAgents — agentic orchestration for the LeRobot pipeline: collect -> train -> eval -> improve"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -36,7 +36,7 @@ leagents = "leagents.cli:main"
 include = ["leagents*"]
 
 [tool.setuptools.package-data]
-leagents = ["dashboard/static/*"]
+leagents = ["dashboard/static/*", "demo/data/**"]
 
 [tool.ruff]
 line-length = 100

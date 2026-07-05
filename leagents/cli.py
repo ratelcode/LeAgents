@@ -135,6 +135,16 @@ def cmd_dash(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_demo(args: argparse.Namespace) -> int:
+    from leagents.demo import install_demo
+
+    run_id, installed = install_demo(Path(args.workdir), Path(args.knowledge))
+    verb = "installed" if installed else "already present"
+    print(f"demo run {run_id} {verb} in {args.workdir}/")
+    print("view it:  leagents status   |   leagents dash  →  http://127.0.0.1:8321")
+    return 0
+
+
 def cmd_doctor(args: argparse.Namespace) -> int:
     from leagents.doctor import run_doctor
 
@@ -168,6 +178,11 @@ def main(argv: list[str] | None = None) -> int:
     setup_p.add_argument("--install-lerobot", action="store_true",
                          help="also install leagents[lerobot] with the CMake compat env")
     setup_p.set_defaults(fn=cmd_setup)
+
+    demo_p = sub.add_parser("demo", help="install the bundled sample run (real 3-cycle M0)")
+    demo_p.add_argument("-w", "--workdir", default="runs")
+    demo_p.add_argument("-k", "--knowledge", default="knowledge")
+    demo_p.set_defaults(fn=cmd_demo)
 
     dash_p = sub.add_parser("dash", help="serve the flow dashboard (needs 'leagents[dash]')")
     dash_p.add_argument("-w", "--workdir", default="runs")

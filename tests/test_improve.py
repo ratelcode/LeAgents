@@ -172,6 +172,41 @@ def test_loop_dispatches_improve_on_promote(loop_config, constitution, tmp_path)
     assert calls[0]["cycle"] == 1
 
 
+def test_failed_harvest_does_not_kill_the_run(loop_config, constitution, tmp_path):
+    from leagents.agents import DataAgent, EvalAgent, TrainAgent
+    from leagents.agents.improve_agent import ImproveError
+    from leagents.events import EventBus
+    from leagents.orchestrator import DeterministicProposer, LoopController
+    from leagents.store import JobStore
+    from tests.conftest import make_eval_runner, make_train_runner
+
+    bus = EventBus(tmp_path / "events.jsonl")
+
+    class BrokenImprove:
+        def run(self, **kwargs):
+            raise ImproveError("rollout collection exited 1")
+
+    controller = LoopController(
+        cfg=loop_config,
+        store=JobStore(tmp_path / "leagents.db"),
+        bus=bus,
+        data_agent=DataAgent(bus),
+        train_agent=TrainAgent(loop_config.train, constitution, bus, make_train_runner()),
+        eval_agent=EvalAgent(loop_config.eval, constitution, bus,
+                             make_eval_runner([0.5, 0.6])),
+        proposer=DeterministicProposer(loop_config.seed_dataset),
+        improve_agent=BrokenImprove(),
+    )
+    loop_config.budgets.max_cycles = 2
+    summary = controller.run("run-improve-crash", tmp_path / "wd")
+
+    # both cycles complete despite the harvest failing on every promotion
+    assert summary.cycles_run == 2
+    events = (tmp_path / "events.jsonl").read_text()
+    assert '"improve_failed"' in events
+    assert '"run_failed"' not in events
+
+
 def test_loop_adaptation_stage_trains_on_rollout_mix(loop_config, constitution, tmp_path):
     from leagents.agents import DataAgent, EvalAgent, TrainAgent
     from leagents.events import EventBus

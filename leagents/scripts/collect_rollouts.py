@@ -117,6 +117,31 @@ def main(argv: list[str] | None = None) -> int:
         env_cfg=env_cfg, policy_cfg=policy_cfg
     )
 
+    # LIBERO's raw observations nest robot_state (a dict of dicts) and render
+    # images flipped relative to the dataset convention; the env step converts
+    # both. lerobot's rollout() appends observations BEFORE that step and then
+    # torch.stack()s them, which crashes on the dict (scale v4, cycle 0). Fold
+    # the env step into preprocess_observation so appended frames are flat,
+    # dataset-convention tensors, and hand rollout an identity env step so the
+    # policy still sees exactly one application (the flip is not idempotent).
+    import lerobot.scripts.lerobot_eval as lerobot_eval_module
+
+    original_preprocess = lerobot_eval_module.preprocess_observation
+
+    def dataset_convention_preprocess(obs):
+        # tensors only: the env step also adds transition scaffolding
+        # (action=None, next.*, info) that torch.stack cannot handle
+        out = env_preprocessor(original_preprocess(obs))
+        return {k: v for k, v in out.items() if isinstance(v, torch.Tensor)}
+
+    def identity_env_preprocessor(obs):
+        # rebuild the scaffolding the real env step would have added, so the
+        # policy preprocessor sees the transition shape it expects
+        return {"action": None, "next.reward": 0.0, "next.done": False,
+                "next.truncated": False, "info": {}, **obs}
+
+    lerobot_eval_module.preprocess_observation = dataset_convention_preprocess
+
     fps = args.fps or int(getattr(env_cfg, "fps", 10))
     dataset: LeRobotDataset | None = None
     kept = attempts = 0
@@ -125,7 +150,7 @@ def main(argv: list[str] | None = None) -> int:
         suite, task_id, env = envs[attempts % len(envs)]
         with torch.inference_mode():
             data = rollout(
-                env, policy, env_preprocessor, env_postprocessor, preprocessor,
+                env, policy, identity_env_preprocessor, env_postprocessor, preprocessor,
                 postprocessor, seeds=[args.seed + attempts], return_observations=True,
             )
         attempts += 1
