@@ -46,6 +46,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--rename-map", default=None, help='JSON, e.g. {"observation.images.image": ...}')
     parser.add_argument("--keep-failures", action="store_true",
                         help="also keep failed episodes (default: success-only)")
+    # TODO(P2.3, design §4.1): --residual-path <dir with residual.pt from
+    # leagents.scripts.train_residual> — wrap the loaded base with the trained
+    # residual (ComposedPolicy at alpha/n_action_steps saved alongside, via
+    # leagents.rl.sac_wrappers.make_residual_forward(deterministic=True)) so
+    # the harvest rolls out the COMPOSED policy on the held-out init states.
+    # Needs a select_action-compatible adapter around ComposedPolicy because
+    # this script drives lerobot's rollout(); deferred until the P2.1 go/no-go
+    # proves the residual is worth harvesting.
     return parser
 
 
