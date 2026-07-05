@@ -27,7 +27,12 @@ class ResidualRLConfig(BaseModel):
     harvest_init_states: tuple[int, int] = (30, 50)
 
     env_steps: int = 150_000  # off-policy budget per targeted task (PLD~250k, ResFiT~75-200k)
-    alpha: float = 0.5  # residual scale; a_t = a_base + alpha*tanh(residual) (PLD LIBERO value)
+    # residual scale; a_t = a_base + alpha*tanh(residual). MEASURED (P2.1, task 4):
+    # alpha=0.5 (PLD's LIBERO value) SATURATES on SmolVLA at n=5 — the residual
+    # learns a ~0.32/dim constant override that breaks the base (composed 0% vs
+    # base 55%). alpha=0.1 is a gentle corrector that CAN'T override a good base
+    # action and learned a real improvement (composed 100% vs base 65%, +0.35).
+    alpha: float = 0.1
     exploration_ramp_steps: int = 15_000  # linear base-only -> composed ramp
     n_action_steps: int = 5  # base re-plan cadence (chunk cache); reactivity/compute trade-off
     utd: int = 4  # update-to-data ratio
