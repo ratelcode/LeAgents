@@ -25,9 +25,9 @@ Once the data bug below was fixed, one M0 run on a single RTX 5070 Ti (16 GB) cl
 |---|---|---|---|
 | 0 | 200 episodes (20/task) | **63%** | promote (baseline) |
 | 1 | 320 | **69%** | promote — the hardest task (bowl-on-cookie-box) rose most, 20% → 50% |
-| 2 | 500 (~50/task) | **72%** | iterate — +3% is real but below `promote_delta`; the 69% checkpoint stays blessed |
+| 2 | 432 (~43/task — every spatial episode the dataset has) | **72%** | iterate — +3% is real but below `promote_delta`; the 69% checkpoint stays blessed |
 
-More data lifted the number, with the expected diminishing return (+6, then +3). Each promotion also **harvested success-filtered rollouts** from the freshly-blessed policy and merged them into a growing "self-play" mix (20 → 40 episodes) — the DexFlyWheel data path, running end-to-end without a human in the loop. (Adaptation *training* on that mix is held back after an over-adaptation regression — see the note in `configs/m0_libero_scale.yaml` — so this run measures the pure data-growth signal.)
+More data lifted the number, with the expected diminishing return (+6, then +3). Cycle 2 drained the well: the seed dataset holds 432 libero_spatial episodes in total (the config asked for 500; the task-filtered selector capped at what exists), so from here the loop's remaining levers are self-generated data, policy escalation, and RL — which is exactly what M1 is for. Each promotion also **harvested success-filtered rollouts** from the freshly-blessed policy and merged them into a growing "self-play" mix (20 → 40 episodes) — the DexFlyWheel data path, running end-to-end without a human in the loop. (Adaptation *training* on that mix is held back after an over-adaptation regression — see the note in `configs/m0_libero_scale.yaml` — so this run measures the pure data-growth signal.)
 
 The decision function did its job in both directions: it promoted the genuine gains and, in an earlier run where an aggressive adaptation stage overfit and dropped success to 20%, it **rolled back and protected the 63% baseline** rather than accepting the regression.
 
