@@ -151,7 +151,7 @@ def build_residual_sac(
     state_dim: int = 8,
     action_dim: int = 7,
     device: str = "cpu",
-    residual_alpha: float = 0.5,
+    residual_alpha: float = 0.1,  # 0.5 saturates & overrides the base — see ResidualRLConfig.alpha
     num_critics: int = 2,
     num_subsample_critics: int | None = None,
     discount: float = 0.99,

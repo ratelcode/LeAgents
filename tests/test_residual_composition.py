@@ -116,7 +116,8 @@ def test_exploration_gate_picks_base_or_composed_by_draw():
 
 def test_config_defaults_validation_and_disjointness():
     c = ResidualRLConfig()
-    assert not c.enabled and c.alpha == 0.5 and c.n_action_steps == 5
+    # α=0.1 not 0.5: measured that 0.5 saturates & overrides the base (P2.1)
+    assert not c.enabled and c.alpha == 0.1 and c.n_action_steps == 5
     with pytest.raises(ValueError):  # overlapping train/harvest ranges
         ResidualRLConfig(train_init_states=(0, 70), harvest_init_states=(60, 100))
     with pytest.raises(ValueError):  # alpha out of (0, 1]
