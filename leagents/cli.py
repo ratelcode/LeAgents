@@ -37,8 +37,9 @@ def _print_event(event: Event) -> None:
 
 
 def _dry_runner_with_synthetic_eval(cmd, log_path):
-    """Dry runner that also fakes lerobot-eval output (pc_success=50) so a
-    --dry-run exercises the full loop, including the decision logic."""
+    """Dry runner that also fakes the outputs downstream agents parse, so a
+    --dry-run exercises the full loop (decision logic, task-filtered selection)
+    without a GPU or the real datasets."""
     result = dry_runner(cmd, log_path)
     if cmd and cmd[0] == "lerobot-eval":
         out = next((a.split("=", 1)[1] for a in cmd if a.startswith("--output_dir=")), None)
@@ -47,6 +48,16 @@ def _dry_runner_with_synthetic_eval(cmd, log_path):
             (Path(out) / "eval_info.json").write_text(
                 json.dumps({"overall": {"pc_success": 50.0}, "dry_run": True})
             )
+    elif any("leagents.scripts.select_episodes" in a for a in cmd):
+        # the Data Agent parses a JSON summary as the log's last line; without
+        # one, a task-filtered dry run dies in _parse_summary (DataError)
+        limit = next((int(a.split("=", 1)[1]) for a in cmd if a.startswith("--limit=")), 0)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_path.write_text(json.dumps({
+            "episodes": list(range(limit)), "selected": limit,
+            "suite_tasks": 10, "tasks_covered": 10, "shards_fetched": 0,
+            "shards_needed": 0, "dry_run": True,
+        }) + "\n")
     return result
 
 
@@ -72,8 +83,11 @@ def cmd_run(args: argparse.Namespace) -> int:
         growth=cfg.data.growth,
         max_episodes=cfg.data.max_episodes,
     )
+    # never let a --dry-run write synthetic observations into the real
+    # knowledge base (the eval scores are fake pc_success=50)
     knowledge_agent = (
-        KnowledgeAgent(cfg.knowledge.root, bus, llm) if cfg.knowledge.enabled else None
+        KnowledgeAgent(cfg.knowledge.root, bus, llm)
+        if cfg.knowledge.enabled and not args.dry_run else None
     )
     if cfg.curation.enabled:
         proposer = CuratedProposer(
