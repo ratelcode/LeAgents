@@ -1,9 +1,11 @@
 # Scale run: the first run sized to actually move success rate.
-# Data reaches the research-verified ~50 episodes per task (500 total over
-# libero_spatial's 10 tasks), weights carry over between cycles, and the
-# full DexFlyWheel path is armed: on any promotion with success > 0, harvest
-# success-filtered rollouts, merge them into a growing mix, and adapt on it
-# at the start of the next cycle. (~8 h on one 16 GB GPU.)
+# Data grows toward the full libero_spatial set (432 episodes exist, ~43/task;
+# the well runs dry at cycle 2), weights carry over between cycles, and on any
+# promotion with success > 0 the loop harvests success-filtered rollouts and
+# merges them into a growing, seed-compatible mix (image dtype, seed fps,
+# panda, real language instructions — so it can be blended into training).
+# There is NO separate "adapt on the mix alone" stage: that overfit and
+# regressed a run 63% -> 20% (see the improve block). (~6 h on one 16 GB GPU.)
 run_name: m0-libero-scale
 workdir: runs
 seed_dataset: HuggingFaceVLA/libero
@@ -50,22 +52,16 @@ eval:
     - --policy.device=cuda
     - '--rename_map={"observation.images.image": "observation.images.camera1", "observation.images.image2": "observation.images.camera2"}'
 
-# DexFlyWheel armed: harvest on promotion (success > 0), adapt next cycle.
-# NOTE: harvested rollouts store a generic task string ("libero:<suite>/<id>"),
-# not LIBERO's language instructions — acceptable for adaptation, revisit
-# when the collector learns to read env task descriptions.
+# Harvest on promotion (success > 0): collect success-filtered rollouts and
+# merge them into a growing mix. The mix is built seed-compatible (via
+# --match-dataset, which copies the seed's fps + robot_type, plus image dtype
+# and real LIBERO language instructions) so it CAN be blended into a later
+# cycle's training — but there is no "adapt on the mix alone" stage, which
+# overfit and regressed a run 63% -> 20%. eval/promote judge the main-trained
+# checkpoint. (provenance: run 20260704-232610, cycle 1)
 improve:
   enabled: true
   episodes: 20
-  # adaptation DISABLED for this run (was 2000): training 2000 steps on the
-  # 20-episode success-filtered mix ALONE overfit and regressed cycle 1 from
-  # 63% -> 20% (catastrophic forgetting; adapt loss fell to 0.156 vs the main
-  # train's ~0.37). With adapt_steps=0 the harvest still accumulates the mix
-  # but eval/promote judge the main-trained checkpoint, so we measure the pure
-  # data-growth flywheel (200->320->500 episodes) cleanly first. Re-enable as
-  # a light, real-data-blended touch once data growth is characterized.
-  # (provenance: run 20260704-232610, cycle 1)
-  adapt_steps: 0
   device: cuda
   # the policy expects camera1/2 — same mapping as train/eval; without it
   # make_policy's feature check kills the harvest (scale v4 cycle 0 lesson)

@@ -34,9 +34,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--repo-id", required=True, help="dataset repo id (local unless pushed)")
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--seed", type=int, default=1000)
-    parser.add_argument("--fps", type=int, default=None, help="default: env config fps")
+    parser.add_argument("--fps", type=int, default=None, help="default: match-dataset, else env config fps")
+    parser.add_argument("--robot-type", default=None, help="default: match-dataset's robot_type")
+    parser.add_argument("--match-dataset", default=None,
+                        help="repo id of the dataset this harvest will be blended with; "
+                             "its fps + robot_type are copied so the merge validates")
+    parser.add_argument("--match-dataset-root", default=None, help="local root for --match-dataset")
     parser.add_argument("--task-text", default=None,
-                        help="language instruction stored per frame (default: env/task string)")
+                        help="language instruction stored per frame (default: the env task's "
+                             "real language instruction, so blended frames are correctly conditioned)")
     parser.add_argument("--rename-map", default=None, help='JSON, e.g. {"observation.images.image": ...}')
     parser.add_argument("--keep-failures", action="store_true",
                         help="also keep failed episodes (default: success-only)")
@@ -55,18 +61,34 @@ def chw_float_to_hwc_uint8(img):
 
 
 def features_from_rollout(observations: dict, action) -> dict:
-    """Build a LeRobotDataset feature spec from one rollout's tensors."""
+    """Build a LeRobotDataset feature spec from one rollout's tensors.
+
+    Images use dtype ``image`` (parquet-embedded), matching HuggingFaceVLA/
+    libero — lerobot's merge validation requires identical feature dicts, so
+    a ``video`` dtype here would make the harvest un-blendable with the seed.
+    """
     features: dict[str, dict] = {}
     for key, value in observations.items():
         sample = value[0, 0]
         if sample.ndim == 3:  # image, stored preprocessed as (c, h, w) float
             c, h, w = sample.shape
-            features[key] = {"dtype": "video", "shape": (h, w, c),
+            features[key] = {"dtype": "image", "shape": (h, w, c),
                              "names": ["height", "width", "channels"]}
         else:
             features[key] = {"dtype": "float32", "shape": tuple(sample.shape), "names": None}
     features["action"] = {"dtype": "float32", "shape": tuple(action[0, 0].shape), "names": None}
     return features
+
+
+def libero_task_languages(suite_name: str) -> dict[int, str]:
+    """task_id -> real language instruction for a LIBERO suite, so harvested
+    frames carry the same conditioning the seed dataset uses (not a synthetic
+    ``libero:<suite>/<id>`` string that would weaken a language-conditioned
+    policy trained on the blend)."""
+    from libero.libero import benchmark
+
+    suite = benchmark.get_benchmark_dict()[suite_name]()
+    return {i: suite.get_task(i).language for i in range(suite.n_tasks)}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -142,7 +164,23 @@ def main(argv: list[str] | None = None) -> int:
 
     lerobot_eval_module.preprocess_observation = dataset_convention_preprocess
 
-    fps = args.fps or int(getattr(env_cfg, "fps", 10))
+    # Match the seed dataset's fps and robot_type so the harvest merges with it.
+    # (The env reports fps 30 while HuggingFaceVLA/libero is labelled fps 10 for
+    # the same 1-obs-per-step cadence — the seed's label is what the policy was
+    # trained against, so it is the one to carry.)
+    match_fps = match_robot = None
+    if args.match_dataset:
+        from lerobot.datasets.lerobot_dataset import LeRobotDatasetMetadata
+
+        mm = LeRobotDatasetMetadata(args.match_dataset, root=args.match_dataset_root)
+        match_fps, match_robot = int(mm.fps), mm.robot_type
+    fps = args.fps or match_fps or int(getattr(env_cfg, "fps", 10))
+    robot_type = args.robot_type or match_robot
+
+    languages: dict[int, str] = {}
+    if args.env_type == "libero" and not args.task_text:
+        languages = libero_task_languages(args.task)
+
     dataset: LeRobotDataset | None = None
     kept = attempts = 0
 
@@ -162,11 +200,12 @@ def main(argv: list[str] | None = None) -> int:
         observations = data["observation"]
         if dataset is None:
             dataset = LeRobotDataset.create(
-                repo_id=args.repo_id, fps=fps, root=args.out,
+                repo_id=args.repo_id, fps=fps, root=args.out, robot_type=robot_type,
                 features=features_from_rollout(observations, data["action"]),
             )
         n_frames = first_done_index(data["done"][0]) + 1
-        task_text = args.task_text or f"{args.env_type}:{suite}/{task_id}"
+        task_text = (args.task_text or languages.get(task_id)
+                     or f"{args.env_type}:{suite}/{task_id}")
         for i in range(n_frames):
             frame = {"task": task_text, "action": data["action"][0, i].to("cpu").numpy()}
             for key, value in observations.items():

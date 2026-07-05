@@ -86,11 +86,8 @@ class ImproveConfig(BaseModel):
 
     enabled: bool = False
     episodes: int = 20  # successful episodes to keep per promotion
-    # Extra fine-tuning steps on the accumulated rollout mix at the start of
-    # each later cycle (DexFlyWheel step 5). 0 disables the adaptation stage.
-    adapt_steps: int = 0
     device: str = "cuda"
-    task_text: str | None = None  # language instruction stored per frame
+    task_text: str | None = None  # override the per-task language instruction
     extra_args: list[str] = Field(default_factory=list)
 
 

@@ -110,14 +110,13 @@ class LoopController:
                     run_id=run_id, cycle=cycle, rung=rung, dataset=dataset, workdir=workdir,
                     init_override=init_override,
                 )
-                # DexFlyWheel step 5: adapt on the accumulated successful-rollout
-                # mix so harvested experience feeds the next candidate
-                if rollout_mix is not None and self.cfg.improve.adapt_steps > 0:
-                    checkpoint = self.train_agent.run(
-                        run_id=run_id, cycle=cycle, rung=rung, dataset=rollout_mix,
-                        workdir=workdir, init_override=checkpoint.path,
-                        steps=self.cfg.improve.adapt_steps, stage="train_adapt",
-                    )
+                # NOTE: there is deliberately no "adapt on the rollout mix alone"
+                # stage here. Training a few thousand steps on the tiny
+                # success-filtered mix by itself overfits and regressed a run
+                # 63% -> 20% (catastrophic forgetting). DexFlyWheel's step 5 is
+                # co-training: the harvested rollouts are a blend INTO the next
+                # cycle's main dataset, which is the Data/Train agents' job — not
+                # a separate fine-tune of the just-trained checkpoint.
                 checkpoint_id = self.store.add_checkpoint(
                     run_id, cycle, checkpoint.policy_type, checkpoint.path
                 )

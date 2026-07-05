@@ -1,10 +1,15 @@
-"""Improvement Agent — DexFlyWheel step 3: success-filtered rollout collection
-(M1, DESIGN.md §3.5).
+"""Improvement Agent — DexFlyWheel steps 3–5 data path (M1, DESIGN.md §3.5).
 
 Runs the blessed policy in sim via ``leagents.scripts.collect_rollouts`` (a
-subprocess, like every other agent) and keeps only successful episodes as a
-new LeRobotDataset. Residual-RL (flywheel step 2) and merging the rollout
-dataset into the training mix are the remaining M1 work.
+subprocess, like every other agent), keeps only successful episodes, and
+accumulates them into a growing "self-play" mix (``_merge``). The harvest is
+built seed-compatible — same fps, robot_type, image dtype, and real language
+instructions (via ``--match-dataset``) — so the mix can be blended into a
+later cycle's *main* training (DexFlyWheel step 5 is co-training, not a
+separate fine-tune of the just-trained checkpoint, which overfits).
+
+Remaining M1 work: residual RL (flywheel step 2, the source of *new*
+coverage) and wiring the mix into the next cycle's training dataset.
 """
 
 from __future__ import annotations
@@ -32,12 +37,14 @@ class ImproveAgent:
         constitution: Constitution,
         bus: EventBus,
         runner: Runner = subprocess_runner,
+        seed_dataset: str | None = None,
     ):
         self.cfg = cfg
         self.eval_cfg = eval_cfg
         self.constitution = constitution
         self.bus = bus
         self.runner = runner
+        self.seed_dataset = seed_dataset
 
     def build_command(self, checkpoint: CheckpointRecord, out_dir: Path, repo_id: str) -> list[str]:
         cmd = [
@@ -49,8 +56,11 @@ class ImproveAgent:
             f"--out={out_dir}",
             f"--repo-id={repo_id}",
             f"--device={self.cfg.device}",
-            *self.cfg.extra_args,
         ]
+        # copy the seed's fps + robot_type so the harvest merges with it
+        if self.seed_dataset:
+            cmd.append(f"--match-dataset={self.seed_dataset}")
+        cmd.extend(self.cfg.extra_args)
         if self.cfg.task_text:
             cmd.append(f"--task-text={self.cfg.task_text}")
         return cmd

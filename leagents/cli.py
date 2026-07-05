@@ -93,7 +93,8 @@ def cmd_run(args: argparse.Namespace) -> int:
         proposer=proposer,
         knowledge_agent=knowledge_agent,
         improve_agent=(
-            ImproveAgent(cfg.improve, cfg.eval, constitution, bus, runner)
+            ImproveAgent(cfg.improve, cfg.eval, constitution, bus, runner,
+                         seed_dataset=cfg.seed_dataset)
             if cfg.improve.enabled else None
         ),
     )

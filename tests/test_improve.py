@@ -41,6 +41,19 @@ def test_command_shape(constitution, bus, tmp_path):
     assert "--policy-path=/ckpt/blessed" in cmd
     assert "--env-type=pusht" in cmd and "--task=PushT-v0" in cmd
     assert "--episodes=5" in cmd and "--device=cpu" in cmd
+    assert not any(a.startswith("--match-dataset") for a in cmd)  # none unless seed given
+
+
+def test_command_passes_seed_as_match_dataset(constitution, bus, tmp_path):
+    agent = ImproveAgent(
+        ImproveConfig(enabled=True, episodes=5, device="cpu"),
+        EvalConfig(env_type="libero", task_suite="libero_spatial", n_episodes=4),
+        constitution, bus, make_rollout_runner({"kept": 3, "attempts": 5}),
+        seed_dataset="HuggingFaceVLA/libero",
+    )
+    cmd = agent.build_command(_ckpt(), tmp_path / "rollouts", "local/r-c0-rollouts")
+    # the harvest copies the seed's fps + robot_type so its mix merges with it
+    assert "--match-dataset=HuggingFaceVLA/libero" in cmd
 
 
 def test_run_returns_dataset_ref_and_summary(constitution, bus, tmp_path):
@@ -94,8 +107,8 @@ def test_collector_helpers():
     action = torch.zeros(1, 5, 7)
     features = features_from_rollout(obs, action)
     assert features["observation.image"] == {
-        "dtype": "video", "shape": (8, 9, 3), "names": ["height", "width", "channels"]
-    }
+        "dtype": "image", "shape": (8, 9, 3), "names": ["height", "width", "channels"]
+    }  # image, not video — must match the seed for the merge to validate
     assert features["observation.state"]["shape"] == (2,)
     assert features["action"]["shape"] == (7,)
 
@@ -207,7 +220,10 @@ def test_failed_harvest_does_not_kill_the_run(loop_config, constitution, tmp_pat
     assert '"run_failed"' not in events
 
 
-def test_loop_adaptation_stage_trains_on_rollout_mix(loop_config, constitution, tmp_path):
+def test_loop_has_no_rollout_adaptation_stage(loop_config, constitution, tmp_path):
+    """Adapting on the tiny rollout mix alone overfit and regressed a run
+    63% -> 20%, so there is exactly ONE train per cycle (the main train) even
+    when a rollout mix is accumulating."""
     from leagents.agents import DataAgent, EvalAgent, TrainAgent
     from leagents.events import EventBus
     from leagents.orchestrator import DeterministicProposer, LoopController
@@ -221,7 +237,6 @@ def test_loop_adaptation_stage_trains_on_rollout_mix(loop_config, constitution, 
         def run(self, **kwargs):
             return DatasetRef(repo_id="local/mix", root="/roots/mix", num_episodes=5), {}
 
-    loop_config.improve.adapt_steps = 500
     loop_config.budgets.max_cycles = 2
     controller = LoopController(
         cfg=loop_config,
@@ -231,20 +246,13 @@ def test_loop_adaptation_stage_trains_on_rollout_mix(loop_config, constitution, 
         train_agent=TrainAgent(loop_config.train, constitution, bus,
                                make_train_runner(seen_cmds=cmds)),
         eval_agent=EvalAgent(loop_config.eval, constitution, bus,
-                             make_eval_runner([0.5, 0.6])),  # both cycles promote
+                             make_eval_runner([0.5, 0.6])),  # both cycles promote + harvest
         proposer=DeterministicProposer(loop_config.seed_dataset),
         improve_agent=SpyImprove(),
     )
-    controller.run("run-adapt", tmp_path / "wd")
+    controller.run("run-noadapt", tmp_path / "wd")
 
-    # cycle 0: one train; cycle 1: seed train + adaptation on the rollout mix
-    assert len(cmds) == 3
-    adapt = cmds[2]
-    assert "--dataset.root=/roots/mix" in adapt
-    assert "--dataset.repo_id=local/mix" in adapt
-    assert "--steps=500" in adapt
-    assert any("cycle_1/train_adapt" in a for a in adapt)
-    assert any("cycle_1/train/checkpoints/last" in a and a.startswith("--policy.path=")
-               for a in adapt)  # adapts FROM this cycle's fresh checkpoint
-    # local datasets never get an episodes subset arg
-    assert not any(a.startswith("--dataset.episodes") for a in adapt)
+    # one train per cycle, never a second (adapt) train on the mix
+    assert len(cmds) == 2
+    assert not any("train_adapt" in a for cmd in cmds for a in cmd)
+    assert not any("--dataset.root=/roots/mix" in a for cmd in cmds for a in cmd)
