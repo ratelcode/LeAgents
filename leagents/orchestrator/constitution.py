@@ -43,6 +43,18 @@ class Constitution:
                 return Verdict(False, "forbidden_args", f"{token!r} is not allowed in M0")
         return Verdict(True)
 
+    def check_imports(self, loaded_modules: Sequence[str]) -> Verdict:
+        """Deny if a CVE-2026-25874 transport/RL-service module is loaded
+        (DESIGN.md §6). Enforcement also lives code-side in leagents.rl.safety
+        (always-on); this is the config-visible policy layer."""
+        forbidden = self.rules.get("forbidden_imports", [])
+        for name in loaded_modules:
+            for prefix in forbidden:
+                if name == prefix or name.startswith(prefix + "."):
+                    return Verdict(False, "forbidden_imports",
+                                   f"{name!r} is a CVE-2026-25874 module (denied)")
+        return Verdict(True)
+
     def check_train(self, steps: int) -> Verdict:
         max_steps = self.rules.get("max_train_steps")
         if max_steps is not None and steps > max_steps:

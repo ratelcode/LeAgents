@@ -8,6 +8,8 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, Field
 
+from leagents.rl.config import ResidualRLConfig
+
 
 class PolicyRung(BaseModel):
     """One rung of the policy escalation ladder (DESIGN.md §3.3).
@@ -89,6 +91,8 @@ class ImproveConfig(BaseModel):
     device: str = "cuda"
     task_text: str | None = None  # override the per-task language instruction
     extra_args: list[str] = Field(default_factory=list)
+    # Phase 2: residual RL before the harvest (design docs/DESIGN_phase2_residual_rl.md).
+    residual_rl: ResidualRLConfig = Field(default_factory=ResidualRLConfig)
 
 
 class CurationConfig(BaseModel):

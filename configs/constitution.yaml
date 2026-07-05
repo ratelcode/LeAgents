@@ -15,3 +15,13 @@ forbidden_commands:
 forbidden_args:
   - --robot                 # real-hardware drivers (M3)
   - --teleop
+
+# Phase 2 residual RL reuses lerobot's transport-free SAC math IN-PROCESS; it
+# must never import the gRPC/pickle surface (CVE-2026-25874). Enforced
+# always-on in code by leagents.rl.safety.assert_cve_safe; listed here for
+# audit. (import prefixes, matched by leagents.rl.safety semantics)
+forbidden_imports:
+  - lerobot.rl.actor
+  - lerobot.rl.learner
+  - lerobot.rl.learner_service
+  - lerobot.transport
