@@ -15,10 +15,18 @@ P2.0 (this module, no GPU / no lerobot needed, fully unit-tested):
   are never imported.
 - ``config.ResidualRLConfig`` — the config surface (wired into ImproveConfig).
 
-Pending (P2.1+, need lerobot + a GPU + LIBERO — see the design's phased plan):
-the SAC actor/critic wrappers over ``lerobot.policies.sac``, the single-process
-``residual_sac_train`` loop, the LIBERO env adapter (sparse reward, init-state
-train/harvest split), and the ``--residual-path`` collector flag.
+P2.1 (need lerobot; GPU for real runs — import these modules directly):
+- ``sac_wrappers`` — residual actor + LayerNorm critic ensemble over
+  ``Q(s, a_exec)``, reusing ``lerobot.policies.sac`` (transport-free).
+- ``libero_driver`` — the real LIBERO task env behind ``ResidualRollout``'s
+  interface, the frozen SmolVLA chunk-predictor bundle, and the offline demo
+  ``a_base`` precompute.
+- ``train.residual_sac_train`` — the single-process RLPD loop with the SAC
+  update math copied out of lerobot's learner (never imported), plus the
+  held-out inner gate. Entrypoint: ``leagents.scripts.train_residual``.
+
+Pending (P2.3): the ``--residual-path`` collector flag (TODO in
+``leagents/scripts/collect_rollouts.py``).
 
 Note: ``config`` and ``safety`` import only pydantic/stdlib, so ``leagents.config``
 (which pulls in ``ResidualRLConfig``) stays torch-free. ``ComposedPolicy`` needs
